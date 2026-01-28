@@ -1,0 +1,103 @@
+import React from 'react';
+import Svg, {
+  G,
+  Path,
+  Defs,
+  Filter,
+  FeFlood,
+  FeColorMatrix,
+  FeMorphology,
+  FeOffset,
+  FeGaussianBlur,
+  FeComposite,
+  FeBlend,
+} from 'react-native-svg';
+
+export default function Logo({ width = 82.64, height = 82.64 }: { width?: number; height?: number }) {
+  return (
+    <Svg width={width} height={height} viewBox="0 0 242 242" fill="none">
+      <Defs>
+        <Filter id="filter0_d_289_27" x="0" y="0" width="242" height="242" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+          <FeFlood floodOpacity="0" result="BackgroundImageFix" />
+          <FeColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+          <FeMorphology radius="12" operator="erode" in="SourceAlpha" result="effect1_dropShadow_289_27" />
+          <FeOffset dy="25" />
+          <FeGaussianBlur stdDeviation="25" />
+          <FeComposite in2="hardAlpha" operator="out" />
+          <FeColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0" />
+          <FeBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_289_27" />
+          <FeBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_289_27" result="shape" />
+        </Filter>
+        <Filter id="filter1_dd_289_27" x="119.326" y="38.2298" width="65.5148" height="65.5148" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+          <FeFlood floodOpacity="0" result="BackgroundImageFix" />
+          <FeColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+          <FeMorphology radius="4" operator="erode" in="SourceAlpha" result="effect1_dropShadow_289_27" />
+          <FeOffset dy="4" />
+          <FeGaussianBlur stdDeviation="3" />
+          <FeComposite in2="hardAlpha" operator="out" />
+          <FeColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0" />
+          <FeBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_289_27" />
+          <FeColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+          <FeMorphology radius="3" operator="erode" in="SourceAlpha" result="effect2_dropShadow_289_27" />
+          <FeOffset dy="10" />
+          <FeGaussianBlur stdDeviation="7.5" />
+          <FeComposite in2="hardAlpha" operator="out" />
+          <FeColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0" />
+          <FeBlend mode="normal" in2="effect1_dropShadow_289_27" result="effect2_dropShadow_289_27" />
+          <FeBlend mode="normal" in="SourceGraphic" in2="effect2_dropShadow_289_27" result="shape" />
+        </Filter>
+      </Defs>
+      <G filter="url(#filter0_d_289_27)">
+        <Path
+          d="M38.1122 49.1447C38.1122 29.2037 54.2775 13.0384 74.2185 13.0384H167.782C187.722 13.0384 203.888 29.2037 203.888 49.1447V142.708C203.888 162.649 187.722 178.814 167.782 178.814H74.2185C54.2775 178.814 38.1122 162.649 38.1122 142.708V49.1447Z"
+          fill="white"
+          shapeRendering="crispEdges"
+        />
+        <Path
+          d="M117.546 129.53C118.596 130.136 119.787 130.456 121 130.456C122.212 130.456 123.404 130.136 124.454 129.53L148.629 115.716C149.678 115.11 150.55 114.239 151.156 113.19C151.762 112.142 152.082 110.952 152.083 109.741V82.1115C152.082 80.9002 151.762 79.7106 151.156 78.6619C150.55 77.6132 149.678 76.7423 148.629 76.1367L124.454 62.3221C123.404 61.7158 122.212 61.3967 121 61.3967C119.787 61.3967 118.596 61.7158 117.546 62.3221L93.3707 76.1367C92.3217 76.7423 91.4504 77.6132 90.8442 78.6619C90.238 79.7106 89.9183 80.9002 89.917 82.1115V109.741C89.9183 110.952 90.238 112.142 90.8442 113.19C91.4504 114.239 92.3217 115.11 93.3707 115.716L117.546 129.53Z"
+          stroke="#6B46C1"
+          strokeWidth="8.60873"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <Path
+          d="M121 130.463V95.9262"
+          stroke="#6B46C1"
+          strokeWidth="8.60873"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <Path
+          d="M90.9185 78.6579L121 95.9262L151.081 78.6579"
+          stroke="#6B46C1"
+          strokeWidth="8.60873"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <Path
+          d="M105.459 69.2294L136.541 87.0157"
+          stroke="#6B46C1"
+          strokeWidth="8.60873"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <G filter="url(#filter1_dd_289_27)">
+          <Path
+            d="M131.361 60.9576C131.361 49.5132 140.638 40.2357 152.083 40.2357C163.527 40.2357 172.805 49.5132 172.805 60.9576C172.805 72.402 163.527 81.6796 152.083 81.6796C140.638 81.6796 131.361 72.402 131.361 60.9576Z"
+            fill="#48BB78"
+            shapeRendering="crispEdges"
+          />
+          <Path
+            d="M145.176 62.6845C145.012 62.685 144.852 62.6392 144.714 62.5523C144.575 62.4655 144.464 62.3411 144.394 62.1937C144.323 62.0464 144.296 61.882 144.315 61.7197C144.334 61.5575 144.399 61.404 144.502 61.2771L153.05 52.4703C153.114 52.3962 153.201 52.3462 153.298 52.3284C153.394 52.3106 153.493 52.3261 153.58 52.3723C153.666 52.4185 153.734 52.4926 153.773 52.5826C153.812 52.6726 153.818 52.773 153.792 52.8674L152.135 58.0652C152.086 58.196 152.069 58.3367 152.087 58.4753C152.104 58.6139 152.155 58.7461 152.235 58.8608C152.315 58.9754 152.421 59.0689 152.545 59.1334C152.669 59.1978 152.807 59.2312 152.946 59.2308H158.99C159.154 59.2302 159.314 59.2761 159.452 59.3629C159.591 59.4498 159.701 59.5741 159.772 59.7215C159.843 59.8689 159.87 60.0333 159.851 60.1955C159.831 60.3578 159.767 60.5113 159.664 60.6382L151.116 69.445C151.052 69.519 150.964 69.569 150.868 69.5868C150.772 69.6046 150.672 69.5892 150.586 69.543C150.5 69.4968 150.432 69.4226 150.393 69.3327C150.354 69.2427 150.347 69.1422 150.373 69.0478L152.031 63.8501C152.08 63.7192 152.096 63.5785 152.079 63.4399C152.061 63.3014 152.011 63.1691 151.931 63.0545C151.851 62.9399 151.745 62.8463 151.621 62.7819C151.497 62.7174 151.359 62.684 151.219 62.6845H145.176Z"
+            fill="white"
+            stroke="white"
+            strokeWidth="1.72175"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </G>
+      </G>
+    </Svg>
+  );
+}
+

@@ -1,0 +1,28 @@
+import React from 'react';
+import Svg, { Path } from 'react-native-svg';
+
+export default function BatteryIcon({ width = 42, height = 42 }: { width?: number; height?: number }) {
+  return (
+    <Svg width={width} height={height} viewBox="0 0 42 42" fill="none">
+      <Path
+        d="M0 21C0 9.40202 9.40202 0 21 0C32.598 0 42 9.40202 42 21C42 32.598 32.598 42 21 42C9.40202 42 0 32.598 0 21Z"
+        fill="#5AC085"
+      />
+      <Path
+        d="M29.5759 19.25C29.9755 21.2111 29.6907 23.25 28.769 25.0266C27.8473 26.8031 26.3444 28.21 24.511 29.0126C22.6775 29.8153 20.6243 29.9651 18.6938 29.4371C16.7633 28.9091 15.0721 27.7352 13.9023 26.1112C12.7325 24.4873 12.1548 22.5113 12.2655 20.513C12.3762 18.5146 13.1687 16.6146 14.5107 15.1298C15.8528 13.645 17.6633 12.6651 19.6403 12.3536C21.6174 12.0422 23.6415 12.4179 25.375 13.4181"
+        stroke="#EEEFF0"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M18.375 20.125L21 22.75L29.75 14"
+        stroke="#EEEFF0"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+

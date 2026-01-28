@@ -1,0 +1,102 @@
+import React from 'react';
+import Svg, { Path } from 'react-native-svg';
+
+export default function CameraViewfinderIcon({
+  width = 112,
+  height = 112,
+  color = '#6B7280',
+}: {
+  width?: number;
+  height?: number;
+  color?: string;
+}) {
+  return (
+    <Svg width={width} height={height} viewBox="0 0 112 112" fill="none">
+      <Path
+        d="M32.6667 14H18.6667C16.0893 14 14 16.0893 14 18.6667V32.6667C14 35.244 16.0893 37.3333 18.6667 37.3333H32.6667C35.244 37.3333 37.3333 35.244 37.3333 32.6667V18.6667C37.3333 16.0893 35.244 14 32.6667 14Z"
+        stroke={color}
+        strokeWidth="9.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M93.3334 14H79.3334C76.7561 14 74.6667 16.0893 74.6667 18.6667V32.6667C74.6667 35.244 76.7561 37.3333 79.3334 37.3333H93.3334C95.9107 37.3333 98.0001 35.244 98.0001 32.6667V18.6667C98.0001 16.0893 95.9107 14 93.3334 14Z"
+        stroke={color}
+        strokeWidth="9.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M32.6667 74.6667H18.6667C16.0893 74.6667 14 76.756 14 79.3334V93.3334C14 95.9107 16.0893 98 18.6667 98H32.6667C35.244 98 37.3333 95.9107 37.3333 93.3334V79.3334C37.3333 76.756 35.244 74.6667 32.6667 74.6667Z"
+        stroke={color}
+        strokeWidth="9.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M98.0001 74.6667H84.0001C81.5247 74.6667 79.1508 75.65 77.4004 77.4004C75.6501 79.1507 74.6667 81.5247 74.6667 84V98"
+        stroke={color}
+        strokeWidth="9.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M98 98V98.0467"
+        stroke={color}
+        strokeWidth="9.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M56.0001 32.6667V46.6667C56.0001 49.142 55.0168 51.516 53.2664 53.2663C51.5161 55.0167 49.1421 56 46.6667 56H32.6667"
+        stroke={color}
+        strokeWidth="9.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M14 56H14.0467"
+        stroke={color}
+        strokeWidth="9.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M56 14H56.0467"
+        stroke={color}
+        strokeWidth="9.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M56 74.6667V74.7134"
+        stroke={color}
+        strokeWidth="9.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M74.6667 56H79.3334"
+        stroke={color}
+        strokeWidth="9.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M98 56V56.0467"
+        stroke={color}
+        strokeWidth="9.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M56 98V93.3333"
+        stroke={color}
+        strokeWidth="9.33333"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
