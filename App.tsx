@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import SplashScreen from './src/components/SplashScreen';
 import DeviceReadyScreen from './src/components/DeviceReadyScreen';
 import TermsAndConditionsScreen from './src/components/TermsAndConditionsScreen';
@@ -16,21 +17,39 @@ import ScanRackQRScreen from './src/components/ScanRackQRScreen';
 import OrderCompleteScreen from './src/components/OrderCompleteScreen';
 import TasksScreen from './src/components/TasksScreen';
 import ProfileScreen from './src/components/ProfileScreen';
+import { Order } from './src/services/order.service';
 
 type Screen = 'splash' | 'deviceReady' | 'terms' | 'login' | 'otp' | 'home' | 'orderReceived' | 'bagScan' | 'orderOverview' | 'activePickSession' | 'orderCompletion' | 'photoInsideBag' | 'scanRackQR' | 'orderComplete' | 'tasks' | 'profile';
 
-export default function App() {
+function AppContent() {
+  const { isAuthenticated, isLoading, login, logout } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('splash');
   const [mobileNumber, setMobileNumber] = useState('');
 
   useEffect(() => {
-    // Show splash screen for 3 seconds, then navigate to device ready screen
+    // Show splash screen for 3 seconds, then navigate based on auth state
     const timer = setTimeout(() => {
-      setCurrentScreen('deviceReady');
+      if (isLoading) {
+        // Still checking auth, wait
+        return;
+      }
+      if (isAuthenticated) {
+        setCurrentScreen('home');
+      } else {
+        setCurrentScreen('deviceReady');
+      }
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [isLoading, isAuthenticated]);
+
+  // Navigate to home when authentication state changes to authenticated (after OTP verification)
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && currentScreen === 'otp') {
+      console.log('[App] User authenticated, navigating to home');
+      setCurrentScreen('home');
+    }
+  }, [isAuthenticated, isLoading, currentScreen]);
 
   const handleDeviceReadyComplete = () => {
     setCurrentScreen('terms');
@@ -45,18 +64,34 @@ export default function App() {
     setCurrentScreen('otp');
   };
 
-  const handleVerifyOTP = (otp: string) => {
-    // Handle OTP verification (to be implemented)
-    console.log('Verifying OTP:', otp);
-    // Navigate to homepage after verification
-    setCurrentScreen('home');
+  const handleVerifyOTP = async (otp: string) => {
+    try {
+      // Login is already called in OTPScreen, just navigate on success
+      // The AuthContext will update isAuthenticated, which triggers navigation
+      console.log('[App] OTP verified, navigating to home screen');
+      setCurrentScreen('home');
+    } catch (error: any) {
+      console.error('[App] OTP verification failed:', error);
+      // Error handling is done in OTPScreen component
+      // Don't navigate if verification failed
+    }
   };
+
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [pickStartTime, setPickStartTime] = useState<Date | null>(null);
+  const [rackLocation, setRackLocation] = useState<string | null>(null);
 
   const handleOrderReceived = () => {
     setCurrentScreen('orderReceived');
+    setSelectedOrder(null); // Reset when going back to order received screen
+    setPickStartTime(null);
+    setRackLocation(null);
   };
 
-  const handleStartPicking = () => {
+  const handleStartPicking = (order?: Order) => {
+    if (order) {
+      setSelectedOrder(order);
+    }
     setCurrentScreen('bagScan');
   };
 
@@ -73,11 +108,15 @@ export default function App() {
   };
 
   const handleStartPickingFromOverview = () => {
+    // Track when picking starts
+    setPickStartTime(new Date());
     setCurrentScreen('activePickSession');
   };
 
   const handleBackFromActivePickSession = () => {
     setCurrentScreen('orderOverview');
+    // Reset pick start time if going back
+    setPickStartTime(null);
   };
 
   const [completedItems, setCompletedItems] = useState<any[]>([]);
@@ -99,7 +138,11 @@ export default function App() {
     setCurrentScreen('orderCompletion');
   };
 
-  const handleRackScanComplete = () => {
+  const handleRackScanComplete = (scannedRackLocation?: string) => {
+    // Store the rack location
+    if (scannedRackLocation) {
+      setRackLocation(scannedRackLocation);
+    }
     setCurrentScreen('orderComplete');
   };
 
@@ -117,9 +160,15 @@ export default function App() {
     }
   };
 
-  const handleSignOut = () => {
-    // Navigate back to login screen
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      setCurrentScreen('login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Still navigate to login
     setCurrentScreen('login');
+    }
   };
 
   const handleBackFromRackScan = () => {
@@ -127,12 +176,10 @@ export default function App() {
   };
 
   const handleNotFound = () => {
-    console.log('Item not found...');
     // Handle not found action
   };
 
   const handleScanItem = () => {
-    console.log('Scanning item...');
     // Handle scan item action
   };
 
@@ -142,7 +189,6 @@ export default function App() {
 
   const handleResendOTP = () => {
     // Handle resend OTP (to be implemented)
-    console.log('Resending OTP to:', mobileNumber);
   };
 
   const renderScreen = () => {
@@ -187,27 +233,26 @@ export default function App() {
       case 'bagScan':
         return (
           <BagScanScreen
-            orderId="ORD-45621"
-            itemCount={18}
-            zone="Zone B"
+            orderId={selectedOrder?.orderId || "ORD-45621"}
+            itemCount={selectedOrder?.itemCount || 18}
+            zone={selectedOrder?.zone || "Zone B"}
             onBack={handleBackFromBagScan}
             onStartScan={handleScanComplete}
             onToggleLight={() => {
               // Handle light toggle
-              console.log('Toggling light...');
             }}
             onManualEntry={() => {
               // Handle manual entry
-              console.log('Manual entry...');
             }}
           />
         );
       case 'orderOverview':
         return (
           <OrderOverviewScreen
-            orderId="ORD-45621"
-            itemCount={18}
-            zone="Zone B"
+            orderId={selectedOrder?.orderId || "ORD-45621"}
+            itemCount={selectedOrder?.itemCount || 18}
+            zone={selectedOrder?.zone || "Zone B"}
+            order={selectedOrder || undefined}
             onBack={handleBackFromOrderOverview}
             onStartPicking={handleStartPickingFromOverview}
           />
@@ -215,9 +260,9 @@ export default function App() {
       case 'activePickSession':
         return (
           <ActivePickSessionScreen
-            orderId="ORD-45621"
-            itemCount={18}
-            zone="Zone B"
+            orderId={selectedOrder?.orderId || "ORD-45621"}
+            itemCount={selectedOrder?.itemCount || 18}
+            zone={selectedOrder?.zone || "Zone B"}
             onBack={handleBackFromActivePickSession}
             onNotFound={handleNotFound}
             onScanItem={handleScanItem}
@@ -227,19 +272,19 @@ export default function App() {
       case 'orderCompletion':
         return (
           <OrderCompletionScreen
-            orderId="ORD-45621"
-            itemCount={18}
-            zone="Zone B"
+            orderId={selectedOrder?.orderId || "ORD-45621"}
+            itemCount={selectedOrder?.itemCount || 18}
+            zone={selectedOrder?.zone || "Zone B"}
             completedItems={completedItems}
             onBack={handleCompletionBack}
-            onComplete={handleCompletionBack}
+            onComplete={handlePhotoComplete}
           />
         );
       case 'photoInsideBag':
         return (
           <PhotoInsideBagScreen
-            orderId="ORD-45621"
-            itemCount={18}
+            orderId={selectedOrder?.orderId || "ORD-45621"}
+            itemCount={selectedOrder?.itemCount || 18}
             bagId="BAG-001"
             onBack={handleBackFromPhoto}
             onComplete={handlePhotoComplete}
@@ -248,7 +293,7 @@ export default function App() {
       case 'scanRackQR':
         return (
           <ScanRackQRScreen
-            orderId="ORD-45621"
+            orderId={selectedOrder?.orderId || "ORD-45621"}
             bagId="BAG-001"
             rackLocation="Rack D1-Slot 3"
             riderName="Rider Rohan"
@@ -257,12 +302,23 @@ export default function App() {
           />
         );
       case 'orderComplete':
+        // Calculate pick time in seconds
+        const calculatedPickTime = pickStartTime
+          ? Math.round((new Date().getTime() - pickStartTime.getTime()) / 1000)
+          : 52; // Fallback to default if no start time tracked
+        
+        // Get target time from selected order (convert from minutes to seconds if needed)
+        // Based on the model, targetTime is in minutes, but the UI shows seconds
+        const targetTimeInSeconds = selectedOrder?.targetTime
+          ? selectedOrder.targetTime * 60
+          : 55; // Fallback to default
+        
         return (
           <OrderCompleteScreen
-            orderId="ORD-45621"
-            rackLocation="RACK-D1-SLOT3"
-            pickTime={52}
-            targetTime={55}
+            orderId={selectedOrder?.orderId || "ORD-45621"}
+            rackLocation={rackLocation || "RACK-D1-SLOT3"}
+            pickTime={calculatedPickTime}
+            targetTime={targetTimeInSeconds}
             onReadyNext={handleReadyNext}
           />
         );
@@ -280,5 +336,13 @@ export default function App() {
         }
       />
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

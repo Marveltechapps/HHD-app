@@ -5,9 +5,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import Header from './Header';
 import { useBatteryLevel } from '../hooks/useBatteryLevel';
+import { useAuth } from '../contexts/AuthContext';
+import { authService, UserProfileResponse } from '../services/auth.service';
 import HomeIcon from './icons/HomeIcon';
 import TasksIcon from './icons/TasksIcon';
 import ProfileIcon from './icons/ProfileIcon';
@@ -36,8 +39,33 @@ export default function ProfileScreen({
   onSignOut,
 }: ProfileScreenProps) {
   const batteryLevel = useBatteryLevel();
+  const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState('');
   const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [profileData, setProfileData] = useState<UserProfileResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch user profile data
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const profile = await authService.getProfile();
+        setProfileData(profile);
+      } catch (err: any) {
+        console.error('[ProfileScreen] Error fetching profile:', err);
+        setError(err.message || 'Failed to load profile');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchProfile();
+    }
+  }, [user]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -56,6 +84,43 @@ export default function ProfileScreen({
     return () => clearInterval(interval);
   }, []);
 
+  // Helper function to format mobile number
+  const formatMobileNumber = (mobile?: string): string => {
+    if (!mobile) return 'N/A';
+    // Format as +91 XXXXXXXXXX
+    if (mobile.length === 10) {
+      return `+91 ${mobile}`;
+    }
+    return mobile;
+  };
+
+  // Helper function to format date
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  // Get display values from profile data
+  const displayName = profileData?.name || user?.name || 'User';
+  const workerId = profileData?.mobile || user?.mobile || 'N/A';
+  const phoneNumber = formatMobileNumber(profileData?.mobile || user?.mobile);
+  const email = 'N/A'; // Email not in User model
+  const warehouse = 'N/A'; // Warehouse not in User model
+  const department = 'Warehouse Operations'; // Default value
+  const role = profileData?.role || user?.role || 'Picker';
+  const shift = 'N/A'; // Shift not in User model
+  const joinDate = formatDate(profileData?.createdAt);
+  const isActive = profileData?.isActive ?? true;
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -65,6 +130,17 @@ export default function ProfileScreen({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading profile...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : (
+          <>
         {/* Profile Card */}
         <View style={styles.profileCard}>
           {/* Profile Avatar */}
@@ -75,14 +151,16 @@ export default function ProfileScreen({
           </View>
 
           {/* Name */}
-          <Text style={styles.name}>ABID AHWAZ</Text>
+          <Text style={styles.name}>{displayName.toUpperCase()}</Text>
 
           {/* Worker ID */}
-          <Text style={styles.workerId}>Worker ID: 9876543210</Text>
+          <Text style={styles.workerId}>Worker ID: {workerId}</Text>
 
           {/* Status Badge */}
           <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>ACTIVE WORKER</Text>
+            <Text style={styles.statusText}>
+              {isActive ? 'ACTIVE WORKER' : 'INACTIVE WORKER'}
+            </Text>
           </View>
         </View>
 
@@ -96,7 +174,7 @@ export default function ProfileScreen({
               <PhoneIcon width={17.5} height={17.5} color={colors.text.secondary} />
               <View style={styles.infoTextContainer}>
                 <Text style={styles.infoLabel}>Phone</Text>
-                <Text style={styles.infoValue}>+91 9876543210</Text>
+                <Text style={styles.infoValue}>{phoneNumber}</Text>
               </View>
             </View>
 
@@ -105,7 +183,7 @@ export default function ProfileScreen({
               <EmailIcon width={17.5} height={17.5} color={colors.text.secondary} />
               <View style={styles.infoTextContainer}>
                 <Text style={styles.infoLabel}>Email</Text>
-                <Text style={styles.infoValue}>abid.ahwaz@warehouse.com</Text>
+                <Text style={styles.infoValue}>{email}</Text>
               </View>
             </View>
 
@@ -114,7 +192,7 @@ export default function ProfileScreen({
               <WarehouseIcon width={17.5} height={17.5} color={colors.text.secondary} />
               <View style={styles.infoTextContainer}>
                 <Text style={styles.infoLabel}>Warehouse</Text>
-                <Text style={styles.infoValue}>Zone A - Section 3</Text>
+                <Text style={styles.infoValue}>{warehouse}</Text>
               </View>
             </View>
           </View>
@@ -128,27 +206,25 @@ export default function ProfileScreen({
             {/* Department */}
             <View style={styles.employmentRow}>
               <Text style={styles.employmentLabel}>Department</Text>
-              <Text style={styles.employmentValue}>Warehouse Operations</Text>
+              <Text style={styles.employmentValue}>{department}</Text>
             </View>
 
             {/* Role */}
             <View style={styles.employmentRow}>
               <Text style={styles.employmentLabel}>Role</Text>
-              <Text style={styles.employmentValue}>Picker</Text>
+              <Text style={styles.employmentValue}>{role}</Text>
             </View>
 
             {/* Shift */}
             <View style={styles.employmentRow}>
               <Text style={styles.employmentLabel}>Shift</Text>
-              <Text style={styles.employmentValue}>
-                Morning (6:00 AM - 2:00 PM)
-              </Text>
+              <Text style={styles.employmentValue}>{shift}</Text>
             </View>
 
             {/* Join Date */}
             <View style={styles.employmentRow}>
               <Text style={styles.employmentLabel}>Join Date</Text>
-              <Text style={styles.employmentValue}>Jan 15, 2024</Text>
+              <Text style={styles.employmentValue}>{joinDate}</Text>
             </View>
           </View>
         </View>
@@ -162,6 +238,8 @@ export default function ProfileScreen({
           <SignOutIcon width={14} height={14} color={colors.priority.high} />
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
+        </>
+        )}
       </ScrollView>
 
       {/* Sign Out Confirmation Modal */}
@@ -396,6 +474,30 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     color: colors.primary,
     textTransform: 'uppercase',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.xl * 2,
+    gap: spacing.m,
+  },
+  loadingText: {
+    ...typography.b1,
+    color: colors.text.secondary,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.xl * 2,
+  },
+  errorText: {
+    ...typography.b1,
+    color: colors.priority.high,
+    fontSize: 16,
+    textAlign: 'center',
   },
 });
 

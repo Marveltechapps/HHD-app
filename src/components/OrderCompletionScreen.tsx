@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import Header from './Header';
 import { useBatteryLevel } from '../hooks/useBatteryLevel';
@@ -19,6 +20,8 @@ import {
   layout,
   colorWithOpacity,
 } from '../design-system/tokens';
+import { scannedItemService, ScannedItem } from '../services/scannedItem.service';
+import { orderService } from '../services/order.service';
 
 interface CompletedItem {
   id: string;
@@ -44,12 +47,35 @@ export default function OrderCompletionScreen({
   orderId = 'ORD-45621',
   itemCount = 18,
   zone = 'Zone B',
-  completedItems = [],
+  completedItems: propCompletedItems = [],
   onBack,
   onComplete,
 }: OrderCompletionScreenProps) {
   const batteryLevel = useBatteryLevel();
   const [currentTime, setCurrentTime] = useState('');
+  
+  // Group initial prop items by name to avoid duplicates
+  const getGroupedItems = (items: CompletedItem[]): CompletedItem[] => {
+    const itemsMap = new Map<string, CompletedItem>();
+    
+    items.forEach((item) => {
+      if (itemsMap.has(item.name)) {
+        // Item already exists, increment quantity
+        const existingItem = itemsMap.get(item.name)!;
+        existingItem.quantity += item.quantity;
+      } else {
+        // New item, add to map
+        itemsMap.set(item.name, { ...item });
+      }
+    });
+    
+    return Array.from(itemsMap.values());
+  };
+  
+  const [completedItems, setCompletedItems] = useState<CompletedItem[]>(
+    propCompletedItems.length > 0 ? getGroupedItems(propCompletedItems) : []
+  );
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const updateTime = () => {
@@ -67,6 +93,82 @@ export default function OrderCompletionScreen({
 
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch scanned items from API
+  useEffect(() => {
+    const fetchScannedItems = async () => {
+      if (!orderId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await scannedItemService.getScannedItems({ orderId });
+        
+        // Transform ScannedItem[] to CompletedItem[] and group by item name
+        const itemsMap = new Map<string, CompletedItem>();
+        
+        response.data.forEach((scannedItem: ScannedItem) => {
+          const itemName = scannedItem.metadata?.itemName || 'Unknown Item';
+          
+          if (itemsMap.has(itemName)) {
+            // Item already exists, increment quantity
+            const existingItem = itemsMap.get(itemName)!;
+            existingItem.quantity += scannedItem.metadata?.quantity || 1;
+          } else {
+            // New item, add to map
+            itemsMap.set(itemName, {
+              id: scannedItem._id,
+              name: itemName,
+              crateId: scannedItem.metadata?.crateId || '-',
+              quantity: scannedItem.metadata?.quantity || 1,
+              grammage: scannedItem.metadata?.grammage || '-',
+              mrp: scannedItem.metadata?.mrp || '-',
+              expiryDate: scannedItem.metadata?.expiryDate || '-',
+              bin: scannedItem.metadata?.location || scannedItem.metadata?.bin || '-',
+            });
+          }
+        });
+
+        // Convert map to array
+        const transformedItems: CompletedItem[] = Array.from(itemsMap.values());
+
+        setCompletedItems(transformedItems);
+      } catch (error) {
+        console.error('Failed to fetch scanned items:', error);
+        // Keep prop items as fallback on error, but group them by name
+        if (propCompletedItems.length > 0) {
+          setCompletedItems(getGroupedItems(propCompletedItems));
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchScannedItems();
+  }, [orderId, propCompletedItems]);
+
+  // Update assignorders status to 'completed' when all items are scanned
+  useEffect(() => {
+    const updateAssignOrderStatus = async () => {
+      if (!orderId || orderId === 'ORD-45621') return; // Skip for test/default order
+      
+      try {
+        console.log('[OrderCompletionScreen] Updating assignorder status to completed for:', orderId);
+        await orderService.updateAssignOrderStatus(orderId, 'completed');
+        console.log('[OrderCompletionScreen] ✅ Assignorder status updated successfully');
+      } catch (error: any) {
+        console.error('[OrderCompletionScreen] ❌ Failed to update assignorder status:', error);
+        // Don't block the UI flow if this fails
+      }
+    };
+
+    // Only update if we have completed items (meaning items were scanned)
+    if (completedItems.length > 0) {
+      updateAssignOrderStatus();
+    }
+  }, [orderId, completedItems.length]);
 
   // Calculate total items scanned
   const totalItemsScanned = completedItems.reduce(
@@ -122,33 +224,44 @@ export default function OrderCompletionScreen({
         {/* Completed Items List */}
         <View style={styles.itemsSection}>
           <Text style={styles.sectionTitle}>Completed Items</Text>
-          <View style={styles.itemsList}>
-            {completedItems.map((item, index) => (
-              <View key={item.id || index} style={styles.itemCard}>
-                <View style={styles.itemCardHeader}>
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemDetails}>
-                      Qty: {item.quantity} • {item.grammage}
-                    </Text>
-                  </View>
-                  <View style={styles.checkmarkContainer}>
-                    <View style={styles.iconWrapper}>
-                      <CheckIcon width={16} height={16} color={colors.white} />
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.loadingText}>Loading completed items...</Text>
+            </View>
+          ) : completedItems.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No completed items found</Text>
+            </View>
+          ) : (
+            <View style={styles.itemsList}>
+              {completedItems.map((item, index) => (
+                <View key={item.id || index} style={styles.itemCard}>
+                  <View style={styles.itemCardHeader}>
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemName}>{item.name}</Text>
+                      <Text style={styles.itemDetails}>
+                        Qty: {item.quantity} • {item.grammage}
+                      </Text>
+                    </View>
+                    <View style={styles.checkmarkContainer}>
+                      <View style={styles.iconWrapper}>
+                        <CheckIcon width={16} height={16} color={colors.white} />
+                      </View>
                     </View>
                   </View>
+                  <View style={styles.itemCardFooter}>
+                    <Text style={styles.itemFooterText}>
+                      Crate: {item.crateId} • Bin: {item.bin}
+                    </Text>
+                    {item.mrp !== '-' && (
+                      <Text style={styles.itemFooterText}>MRP: {item.mrp}</Text>
+                    )}
+                  </View>
                 </View>
-                <View style={styles.itemCardFooter}>
-                  <Text style={styles.itemFooterText}>
-                    Crate: {item.crateId} • Bin: {item.bin}
-                  </Text>
-                  {item.mrp !== '-' && (
-                    <Text style={styles.itemFooterText}>MRP: {item.mrp}</Text>
-                  )}
-                </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -156,7 +269,7 @@ export default function OrderCompletionScreen({
       <View style={styles.footer}>
         <PrimaryButton
           title="NEXT"
-          onPress={onComplete || onBack}
+          onPress={onComplete || onBack || (() => {})}
           fullWidth={true}
         />
       </View>
@@ -303,6 +416,25 @@ const styles = StyleSheet.create({
     borderTopWidth: 2,
     borderTopColor: colors.border,
     ...shadows.large,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+    gap: spacing.m,
+  },
+  loadingText: {
+    ...typography.b2,
+    color: colors.text.secondary,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+  },
+  emptyText: {
+    ...typography.b2,
+    color: colors.text.secondary,
   },
 });
 

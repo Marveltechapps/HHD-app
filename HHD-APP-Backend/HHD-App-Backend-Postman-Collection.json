@@ -1,0 +1,1003 @@
+{
+	"info": {
+		"_postman_id": "hhd-app-backend-collection",
+		"name": "HHD App Backend API",
+		"description": "Complete API collection for HHD App Backend - All endpoints with request examples",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "Check if the server is running and healthy"
+					}
+				}
+			]
+		},
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Send OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json" 
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"mobile\": \"9876543210\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/send-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "send-otp"]
+						},
+						"description": "Send OTP to mobile number. In development mode, OTP is returned in response."
+					}
+				},
+				{
+					"name": "Verify OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"mobile\": \"9876543210\",\n  \"otp\": \"1234\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/verify-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "verify-otp"]
+						},
+						"description": "Verify OTP and login/register user. Returns JWT token."
+					}
+				},
+				{
+					"name": "Get Current User",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "me"]
+						},
+						"description": "Get current logged in user (Protected)"
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/logout",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "logout"]
+						},
+						"description": "Logout user (Protected)"
+					}
+				}
+			]
+		},
+		{
+			"name": "Orders",
+			"item": [
+				{
+					"name": "Get All Orders",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/orders?status=&page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "orders"],
+							"query": [
+								{
+									"key": "status",
+									"value": "",
+									"description": "Filter by status (optional)"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get all orders for the authenticated user (Protected)"
+					}
+				},
+				{
+					"name": "Get Order by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/orders/:orderId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "orders", ":orderId"],
+							"variable": [
+								{
+									"key": "orderId",
+									"value": "ORDER-001"
+								}
+							]
+						},
+						"description": "Get single order by ID (Protected)"
+					}
+				},
+				{
+					"name": "Create Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"orderId\": \"ORDER-001\",\n  \"zone\": \"A\",\n  \"itemCount\": 10,\n  \"targetTime\": \"2024-01-15T10:00:00Z\",\n  \"items\": [\n    {\n      \"itemCode\": \"ITEM-001\",\n      \"name\": \"Product Name\",\n      \"quantity\": 2,\n      \"location\": \"A-1-2\"\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/orders",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "orders"]
+						},
+						"description": "Create new order (Protected)"
+					}
+				},
+				{
+					"name": "Update Order Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"picking\",\n  \"bagId\": \"BAG-001\",\n  \"rackLocation\": \"RACK-A1\",\n  \"riderName\": \"John Doe\",\n  \"riderId\": \"RIDER-001\",\n  \"pickTime\": \"2024-01-15T10:30:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/orders/:orderId/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "orders", ":orderId", "status"],
+							"variable": [
+								{
+									"key": "orderId",
+									"value": "ORDER-001"
+								}
+							]
+						},
+						"description": "Update order status and related fields (Protected)"
+					}
+				},
+				{
+					"name": "Get Orders by Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/orders/status/:status",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "orders", "status", ":status"],
+							"variable": [
+								{
+									"key": "status",
+									"value": "received",
+									"description": "Order status: received, picking, packed, completed, cancelled"
+								}
+							]
+						},
+						"description": "Get orders filtered by status (Protected)"
+					}
+				},
+				{
+					"name": "Get Assign Orders by Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/orders/assignorders/status/:status",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "orders", "assignorders", "status", ":status"],
+							"variable": [
+								{
+									"key": "status",
+									"value": "received",
+									"description": "Assign order status: received, picking, packed, completed, cancelled"
+								}
+							]
+						},
+						"description": "Get assign orders filtered by status from assignorders collection (Protected)"
+					}
+				},
+				{
+					"name": "Update Assign Order Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"picking\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/orders/assignorders/:orderId/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "orders", "assignorders", ":orderId", "status"],
+							"variable": [
+								{
+									"key": "orderId",
+									"value": "ORDER-001"
+								}
+							]
+						},
+						"description": "Update assign order status in assignorders collection (Protected)"
+					}
+				}
+			]
+		},
+		{
+			"name": "Bags",
+			"item": [
+				{
+					"name": "Scan Bag",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"qrCode\": \"BAG-001-25L-XYZ123\",\n  \"orderId\": \"ORDER-001\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/bags/scan",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "bags", "scan"]
+						},
+						"description": "Scan bag QR code. Format: BAG-{number}-{size}-{code} (Protected)"
+					}
+				},
+				{
+					"name": "Get Bag by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/bags/:bagId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "bags", ":bagId"],
+							"variable": [
+								{
+									"key": "bagId",
+									"value": "BAG-001"
+								}
+							]
+						},
+						"description": "Get bag details by ID (Protected)"
+					}
+				},
+				{
+					"name": "Update Bag",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"packed\",\n  \"photoUrl\": \"https://example.com/photo.jpg\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/bags/:bagId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "bags", ":bagId"],
+							"variable": [
+								{
+									"key": "bagId",
+									"value": "BAG-001"
+								}
+							]
+						},
+						"description": "Update bag status and photo URL (Protected)"
+					}
+				}
+			]
+		},
+		{
+			"name": "Items",
+			"item": [
+				{
+					"name": "Get Order Items",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/items/order/:orderId?status=",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "items", "order", ":orderId"],
+							"query": [
+								{
+									"key": "status",
+									"value": "",
+									"description": "Filter by item status (optional)"
+								}
+							],
+							"variable": [
+								{
+									"key": "orderId",
+									"value": "ORDER-001"
+								}
+							]
+						},
+						"description": "Get all items for an order (Protected)"
+					}
+				},
+				{
+					"name": "Scan Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"orderId\": \"ORDER-001\",\n  \"itemCode\": \"ITEM-001\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/items/scan",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "items", "scan"]
+						},
+						"description": "Scan item barcode and mark as scanned (Protected)"
+					}
+				},
+				{
+					"name": "Mark Item as Not Found",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notes\": \"Item not found in location A-1-2\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/items/:itemId/not-found",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "items", ":itemId", "not-found"],
+							"variable": [
+								{
+									"key": "itemId",
+									"value": "ITEM_ID_HERE"
+								}
+							]
+						},
+						"description": "Mark item as not found (Protected)"
+					}
+				},
+				{
+					"name": "Update Item",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"scanned\",\n  \"location\": \"A-1-2\",\n  \"notes\": \"Found in alternate location\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/items/:itemId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "items", ":itemId"],
+							"variable": [
+								{
+									"key": "itemId",
+									"value": "ITEM_ID_HERE"
+								}
+							]
+						},
+						"description": "Update item status, location, or notes (Protected)"
+					}
+				}
+			]
+		},
+		{
+			"name": "Racks",
+			"item": [
+				{
+					"name": "Scan Rack",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"qrCode\": \"Rack-D1-Slot3 (John Doe)\",\n  \"orderId\": \"ORDER-001\",\n  \"riderId\": \"RIDER-001\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/racks/scan",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "racks", "scan"]
+						},
+						"description": "Scan rack QR code. Format: Rack-{identifier}-Slot{number} (rider name). Example: Rack-D1-Slot3 (John Doe). The rackIdentifier (D1), slotNumber (3), and riderName (John Doe) are extracted automatically from the QR code. (Protected)"
+					}
+				},
+				{
+					"name": "Get Rack by Code",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/racks/:rackCode",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "racks", ":rackCode"],
+							"variable": [
+								{
+									"key": "rackCode",
+									"value": "RACK-A1"
+								}
+							]
+						},
+						"description": "Get rack details by code (Protected)"
+					}
+				},
+				{
+					"name": "Get Available Racks",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/racks/available?zone=",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "racks", "available"],
+							"query": [
+								{
+									"key": "zone",
+									"value": "",
+									"description": "Filter by zone (optional)"
+								}
+							]
+						},
+						"description": "Get all available racks (Protected)"
+					}
+				}
+			]
+		},
+		{
+			"name": "Tasks",
+			"item": [
+				{
+					"name": "Get All Tasks",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks?status=&priority=&page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks"],
+							"query": [
+								{
+									"key": "status",
+									"value": "",
+									"description": "Filter by status (optional)"
+								},
+								{
+									"key": "priority",
+									"value": "",
+									"description": "Filter by priority (optional)"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get all tasks for the authenticated user (Protected)"
+					}
+				},
+				{
+					"name": "Create Task",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Complete order picking\",\n  \"description\": \"Pick all items for ORDER-001\",\n  \"orderId\": \"ORDER-001\",\n  \"priority\": \"high\",\n  \"dueDate\": \"2024-01-15T12:00:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks"]
+						},
+						"description": "Create a new task (Protected)"
+					}
+				},
+				{
+					"name": "Update Task",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated task title\",\n  \"description\": \"Updated description\",\n  \"status\": \"completed\",\n  \"priority\": \"medium\",\n  \"dueDate\": \"2024-01-15T14:00:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks/:taskId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks", ":taskId"],
+							"variable": [
+								{
+									"key": "taskId",
+									"value": "TASK_ID_HERE"
+								}
+							]
+						},
+						"description": "Update task details (Protected)"
+					}
+				},
+				{
+					"name": "Delete Task",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks/:taskId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks", ":taskId"],
+							"variable": [
+								{
+									"key": "taskId",
+									"value": "TASK_ID_HERE"
+								}
+							]
+						},
+						"description": "Delete a task (Protected)"
+					}
+				}
+			]
+		},
+		{
+			"name": "Photos",
+			"item": [
+				{
+					"name": "Upload Photo",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "photo",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "orderId",
+									"value": "ORDER-001",
+									"type": "text"
+								},
+								{
+									"key": "bagId",
+									"value": "BAG-001",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/photos",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "photos"]
+						},
+						"description": "Upload photo for a bag (multipart/form-data) (Protected)"
+					}
+				},
+				{
+					"name": "Get Photo by Order and Bag",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/photos/order/:orderId/bag/:bagId",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "photos", "order", ":orderId", "bag", ":bagId"],
+							"variable": [
+								{
+									"key": "orderId",
+									"value": "ORDER-001"
+								},
+								{
+									"key": "bagId",
+									"value": "BAG-001"
+								}
+							]
+						},
+						"description": "Get photo by order ID and bag ID (Protected)"
+					}
+				},
+				{
+					"name": "Verify Photo",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/photos/:photoId/verify",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "photos", ":photoId", "verify"],
+							"variable": [
+								{
+									"key": "photoId",
+									"value": "PHOTO_ID_HERE"
+								}
+							]
+						},
+						"description": "Verify a photo (Protected)"
+					}
+				}
+			]
+		},
+		{
+			"name": "Users",
+			"item": [
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "profile"]
+						},
+						"description": "Get user profile (Protected)"
+					}
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"John Doe\",\n  \"deviceId\": \"DEVICE-123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "profile"]
+						},
+						"description": "Update user profile (Protected)"
+					}
+				}
+			]
+		},
+		{
+			"name": "Scanned Items",
+			"item": [
+				{
+					"name": "Create Scanned Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"barcodeData\": \"1234567890123\",\n  \"barcodeType\": \"ean13\",\n  \"orderId\": \"ORDER-001\",\n  \"deviceId\": \"DEVICE-123\",\n  \"metadata\": {\n    \"location\": \"A-1-2\",\n    \"timestamp\": \"2024-01-15T10:00:00Z\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/scanned-items",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "scanned-items"]
+						},
+						"description": "Create a new scanned item record (Protected)"
+					}
+				},
+				{
+					"name": "Get All Scanned Items",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/scanned-items?orderId=&userId=&deviceId=&barcodeType=&startDate=&endDate=&limit=50&page=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "scanned-items"],
+							"query": [
+								{
+									"key": "orderId",
+									"value": "",
+									"description": "Filter by order ID (optional)"
+								},
+								{
+									"key": "userId",
+									"value": "",
+									"description": "Filter by user ID (optional)"
+								},
+								{
+									"key": "deviceId",
+									"value": "",
+									"description": "Filter by device ID (optional)"
+								},
+								{
+									"key": "barcodeType",
+									"value": "",
+									"description": "Filter by barcode type (optional)"
+								},
+								{
+									"key": "startDate",
+									"value": "",
+									"description": "Start date filter (ISO format) (optional)"
+								},
+								{
+									"key": "endDate",
+									"value": "",
+									"description": "End date filter (ISO format) (optional)"
+								},
+								{
+									"key": "limit",
+									"value": "50"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								}
+							]
+						},
+						"description": "Get all scanned items with filters (Protected)"
+					}
+				},
+				{
+					"name": "Get Scanned Item by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/scanned-items/:id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "scanned-items", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "SCANNED_ITEM_ID_HERE"
+								}
+							]
+						},
+						"description": "Get a single scanned item by ID (Protected)"
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string",
+			"description": "JWT token from verify-otp endpoint"
+		}
+	]
+}

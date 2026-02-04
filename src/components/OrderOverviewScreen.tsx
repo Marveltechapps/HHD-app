@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import Header from './Header';
 import { useBatteryLevel } from '../hooks/useBatteryLevel';
@@ -16,6 +17,8 @@ import SnacksCategoryIcon from './icons/SnacksCategoryIcon';
 import GroceryCategoryIcon from './icons/GroceryCategoryIcon';
 import CareCategoryIcon from './icons/CareCategoryIcon';
 import OrderDetailsIcon from './icons/OrderDetailsIcon';
+import { itemService, Item } from '../services/item.service';
+import { orderService, Order } from '../services/order.service';
 import {
   colors,
   typography,
@@ -29,6 +32,7 @@ interface OrderOverviewScreenProps {
   orderId?: string;
   itemCount?: number;
   zone?: string;
+  order?: Order;
   onBack?: () => void;
   onStartPicking?: () => void;
 }
@@ -46,11 +50,27 @@ export default function OrderOverviewScreen({
   orderId = 'ORD-45621',
   itemCount = 18,
   zone = 'Zone B',
+  order: orderProp,
   onBack,
   onStartPicking,
 }: OrderOverviewScreenProps) {
   const batteryLevel = useBatteryLevel();
   const [currentTime, setCurrentTime] = useState('');
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [orderDetails, setOrderDetails] = useState<Order | null>(orderProp || null);
+  const [loadingOrderDetails, setLoadingOrderDetails] = useState(false);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({
+    Fresh: 0,
+    Snacks: 0,
+    Grocery: 0,
+    Care: 0,
+  });
+
+  // Use orderId from prop or order object
+  const actualOrderId = orderProp?.orderId || orderId;
+  const actualItemCount = orderProp?.itemCount || itemCount;
+  const actualZone = orderProp?.zone || zone;
 
   useEffect(() => {
     const updateTime = () => {
@@ -69,13 +89,75 @@ export default function OrderOverviewScreen({
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch order details if not provided
+  useEffect(() => {
+    const fetchOrderDetails = async () => {
+      if (orderProp) {
+        setOrderDetails(orderProp);
+        return;
+      }
+
+      if (actualOrderId && actualOrderId !== 'ORD-45621') {
+        try {
+          setLoadingOrderDetails(true);
+          const response = await orderService.getOrder(actualOrderId);
+          if (response.order) {
+            setOrderDetails(response.order);
+          }
+        } catch (error) {
+          console.error('Failed to fetch order details:', error);
+        } finally {
+          setLoadingOrderDetails(false);
+        }
+      }
+    };
+
+    fetchOrderDetails();
+  }, [actualOrderId, orderProp]);
+
+  // Fetch items and aggregate by category
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        setLoading(true);
+        const fetchedItems = await itemService.getItemsByOrder(actualOrderId);
+        setItems(fetchedItems);
+
+        // Aggregate items by category
+        const counts: Record<string, number> = {
+          Fresh: 0,
+          Snacks: 0,
+          Grocery: 0,
+          Care: 0,
+        };
+
+        fetchedItems.forEach((item) => {
+          if (item.category && counts.hasOwnProperty(item.category)) {
+            counts[item.category] += item.quantity || 1;
+          }
+        });
+
+        setCategoryCounts(counts);
+      } catch (error) {
+        console.error('Failed to fetch items:', error);
+        // Keep default counts of 0 on error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (actualOrderId) {
+      fetchItems();
+    }
+  }, [actualOrderId]);
+
   // Calculate bag size based on item count
   const getBagSize = () => {
-    if (itemCount <= 10) {
+    if (actualItemCount <= 10) {
       return '15L';
-    } else if (itemCount <= 20) {
+    } else if (actualItemCount <= 20) {
       return '25L';
-    } else if (itemCount <= 35) {
+    } else if (actualItemCount <= 35) {
       return '35L';
     } else {
       return '50L';
@@ -83,6 +165,27 @@ export default function OrderOverviewScreen({
   };
 
   const bagSize = getBagSize();
+
+  // Format target time (convert minutes to seconds if needed, or use as-is)
+  const formatTargetTime = () => {
+    const targetTime = orderDetails?.targetTime;
+    if (targetTime === undefined || targetTime === null) return '55 seconds';
+    
+    // Based on seed data, targetTime appears to be in minutes
+    // Convert to seconds for display
+    const seconds = targetTime * 60;
+    return `${seconds} seconds`;
+  };
+
+  // Format zone display
+  const formatDeliveryZone = () => {
+    const zoneValue = orderDetails?.zone || actualZone;
+    // If zone is like "A", "B", etc., format it
+    if (zoneValue && !zoneValue.includes('Zone')) {
+      return `Zone ${zoneValue}`;
+    }
+    return zoneValue || 'Zone B';
+  };
 
   // Category icon component - using actual Figma icons
   const renderCategoryIcon = (color: string, type: string) => {
@@ -101,32 +204,32 @@ export default function OrderOverviewScreen({
     }
   };
 
-  // Category data
+  // Category data - dynamically generated from aggregated counts
   const categories: CategoryItem[] = [
     {
       name: 'Fresh',
-      count: 5,
+      count: categoryCounts.Fresh,
       color: colors.category.fresh,
       backgroundColor: 'rgba(72, 187, 120, 0.1)',
       borderColor: 'rgba(72, 187, 120, 0.3)',
     },
     {
       name: 'Snacks',
-      count: 4,
+      count: categoryCounts.Snacks,
       color: colors.category.snacks,
       backgroundColor: 'rgba(245, 158, 11, 0.1)',
       borderColor: 'rgba(245, 158, 11, 0.3)',
     },
     {
       name: 'Grocery',
-      count: 6,
+      count: categoryCounts.Grocery,
       color: colors.category.grocery,
       backgroundColor: 'rgba(107, 70, 193, 0.1)',
       borderColor: 'rgba(107, 70, 193, 0.3)',
     },
     {
       name: 'Care',
-      count: 3,
+      count: categoryCounts.Care,
       color: colors.category.care,
       backgroundColor: 'rgba(59, 130, 246, 0.1)',
       borderColor: 'rgba(59, 130, 246, 0.3)',
@@ -156,11 +259,11 @@ export default function OrderOverviewScreen({
             </TouchableOpacity>
             <View style={styles.orderInfoLeft}>
               <View style={styles.orderIdRow}>
-                <Text style={styles.orderId}>{orderId}</Text>
-                <Text style={styles.itemCount}>({itemCount} items)</Text>
+                <Text style={styles.orderId}>{actualOrderId}</Text>
+                <Text style={styles.itemCount}>({actualItemCount} items)</Text>
               </View>
             </View>
-            <Text style={styles.zoneText}>📦 {zone}</Text>
+            <Text style={styles.zoneText}>📦 {formatDeliveryZone()}</Text>
           </View>
         </View>
       </View>
@@ -180,7 +283,7 @@ export default function OrderOverviewScreen({
               <View style={styles.bagScanText}>
                 <Text style={styles.bagScanTitle}>📦 Scan Bag First</Text>
                 <Text style={styles.bagScanSubtitle}>
-                  Required: {bagSize} bag for {itemCount} items
+                  Required: {bagSize} bag for {actualItemCount} items
                 </Text>
               </View>
             </View>
@@ -204,6 +307,11 @@ export default function OrderOverviewScreen({
         {/* Item Categories Section */}
         <View style={styles.categoriesSection}>
           <Text style={styles.sectionTitle}>Item Categories</Text>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
           <View style={styles.categoriesGrid}>
             {categories.map((category, index) => (
               <View
@@ -236,6 +344,7 @@ export default function OrderOverviewScreen({
               </View>
             ))}
           </View>
+          )}
         </View>
 
         {/* Order Details Section */}
@@ -244,28 +353,38 @@ export default function OrderOverviewScreen({
             <OrderDetailsIcon width={21} height={21} color={colors.primary} />
             <Text style={styles.orderDetailsTitle}>Order Details</Text>
           </View>
-          <View style={styles.orderDetailsContent}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Priority:</Text>
-              <View style={styles.priorityBadge}>
-                <Text style={styles.priorityText}>HIGH</Text>
+          {loadingOrderDetails ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : (
+            <View style={styles.orderDetailsContent}>
+              {orderDetails?.riderName && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Rider:</Text>
+                  <Text style={styles.detailValue}>{orderDetails.riderName}</Text>
+                </View>
+              )}
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Delivery Zone:</Text>
+                <Text style={[styles.detailValue, { color: colors.success }]}>
+                  {formatDeliveryZone()}
+                </Text>
               </View>
+              {orderDetails?.targetTime !== undefined && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Target Time:</Text>
+                  <Text style={styles.detailValue}>{formatTargetTime()}</Text>
+                </View>
+              )}
+              {orderDetails?.rackLocation && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Rack Location:</Text>
+                  <Text style={styles.detailValue}>{orderDetails.rackLocation}</Text>
+                </View>
+              )}
             </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Delivery Zone:</Text>
-              <Text style={[styles.detailValue, { color: colors.success }]}>
-                Sector 3 (1.2km)
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Target Time:</Text>
-              <Text style={styles.detailValue}>55 seconds</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Customer:</Text>
-              <Text style={styles.detailValue}>#C-89234</Text>
-            </View>
-          </View>
+          )}
         </View>
       </ScrollView>
 
@@ -481,6 +600,12 @@ const styles = StyleSheet.create({
   categoryLabel: {
     ...typography.bodyTiny,
     opacity: 0.7,
+  },
+  loadingContainer: {
+    padding: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 200,
   },
   orderDetailsCard: {
     backgroundColor: colors.surface,

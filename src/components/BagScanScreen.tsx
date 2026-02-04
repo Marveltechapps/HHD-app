@@ -5,6 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { CameraView, BarcodeScanningResult } from 'expo-camera';
 import Header from './Header';
@@ -16,6 +18,7 @@ import ManualIcon from './icons/ManualIcon';
 import CameraViewfinderIcon from './icons/CameraViewfinderIcon';
 import ScannerIcon from './icons/ScannerIcon';
 import ManualEntryModal from './ManualEntryModal';
+import { bagService } from '../services/bag.service';
 import {
   colors,
   typography,
@@ -50,6 +53,8 @@ export default function BagScanScreen({
   const [lightOn, setLightOn] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | undefined>();
   const cameraRef = useRef<CameraView>(null);
 
   useEffect(() => {
@@ -94,13 +99,140 @@ export default function BagScanScreen({
     setIsScanning(true);
   };
 
-  const handleBarcodeScanned = ({ data, type }: BarcodeScanningResult) => {
-    if (isScanning && type === 'qr') {
+  const handleBarcodeScanned = async ({ data, type }: BarcodeScanningResult) => {
+    if (isScanning && type === 'qr' && !isSubmitting) {
       console.log('QR Code scanned:', data);
       setIsScanning(false);
-      // Validate the scanned QR code matches expected format
-      // For now, proceed to next screen
-      onStartScan?.(); // Navigate to order overview after scan completes
+      setIsSubmitting(true);
+      setError(undefined);
+
+      try {
+        // Validate QR code format (should start with BAG-)
+        if (!data || !data.startsWith('BAG-')) {
+          throw new Error('Invalid bag QR code format. Expected format: BAG-{number}-{size}-{code}');
+        }
+
+        // Call API to scan bag
+        const bag = await bagService.scanBag({
+          qrCode: data,
+          orderId,
+        });
+
+        console.log('Bag scanned successfully:', bag);
+        
+        // Reset submitting state immediately
+        setIsSubmitting(false);
+        
+        // Navigate immediately after successful scan (don't wait for Alert)
+        // Show success message as non-blocking notification
+        Alert.alert(
+          'Bag Scanned Successfully',
+          `Bag ID: ${bag.bagId}\nSize: ${bag.size || 'N/A'}\nStatus: ${bag.status}`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Navigation already happened, just close alert
+              },
+            },
+          ]
+        );
+        
+        // Navigate to next screen immediately
+        onStartScan?.();
+      } catch (error: any) {
+        console.error('Error scanning bag:', error);
+        const errorMessage = error.message || 'Failed to scan bag. Please try again.';
+        setError(errorMessage);
+        setIsSubmitting(false);
+        
+        // Check if it's a duplicate bag error (409 status or specific message)
+        const isDuplicateBag = error.status === 409 || errorMessage.includes('already been scanned');
+        
+        Alert.alert(
+          isDuplicateBag ? 'Bag Already Scanned' : 'Scan Failed',
+          isDuplicateBag 
+            ? `${errorMessage}\n\nPlease scan a different bag.`
+            : errorMessage,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Reset scanning state to allow user to scan again
+                setIsScanning(false);
+              },
+            },
+          ]
+        );
+      }
+    }
+  };
+
+  const handleManualEntry = async (bagCode: string) => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setError(undefined);
+    setShowManualModal(false);
+
+    try {
+      // Validate QR code format
+      if (!bagCode || !bagCode.startsWith('BAG-')) {
+        throw new Error('Invalid bag QR code format. Expected format: BAG-{number}-{size}-{code}');
+      }
+
+      // Call API to scan bag
+      const bag = await bagService.scanBag({
+        qrCode: bagCode,
+        orderId,
+      });
+
+      console.log('Bag scanned successfully (manual):', bag);
+      
+      // Reset submitting state immediately
+      setIsSubmitting(false);
+      
+      // Navigate immediately after successful scan (don't wait for Alert)
+      // Show success message as non-blocking notification
+      Alert.alert(
+        'Bag Scanned Successfully',
+        `Bag ID: ${bag.bagId}\nSize: ${bag.size || 'N/A'}\nStatus: ${bag.status}`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigation already happened, just close alert
+            },
+          },
+        ]
+      );
+      
+      // Navigate to next screen immediately
+      onStartScan?.();
+    } catch (error: any) {
+      console.error('Error scanning bag (manual):', error);
+      const errorMessage = error.message || 'Failed to scan bag. Please try again.';
+      setError(errorMessage);
+      setIsSubmitting(false);
+      
+      // Check if it's a duplicate bag error (409 status or specific message)
+      const isDuplicateBag = error.status === 409 || errorMessage.includes('already been scanned');
+      
+      Alert.alert(
+        isDuplicateBag ? 'Bag Already Scanned' : 'Scan Failed',
+        isDuplicateBag 
+          ? `${errorMessage}\n\nPlease scan a different bag.`
+          : errorMessage,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Reset state to allow user to try again
+              setIsScanning(false);
+            },
+          },
+        ]
+      );
     }
   };
 
@@ -206,15 +338,27 @@ export default function BagScanScreen({
 
       {/* Fixed Action Buttons */}
       <View style={styles.fixedActionButtons}>
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
         <TouchableOpacity
-          style={[styles.startScanButton, isScanning && styles.startScanButtonDisabled]}
+          style={[
+            styles.startScanButton,
+            (isScanning || isSubmitting) && styles.startScanButtonDisabled,
+          ]}
           onPress={handleStartScan}
           activeOpacity={0.8}
-          disabled={isScanning}
+          disabled={isScanning || isSubmitting}
         >
-          <Text style={styles.startScanButtonText}>
-            {isScanning ? 'SCANNING...' : 'START SCAN'}
-          </Text>
+          {isSubmitting ? (
+            <ActivityIndicator color={colors.white} />
+          ) : (
+            <Text style={styles.startScanButtonText}>
+              {isScanning ? 'SCANNING...' : 'START SCAN'}
+            </Text>
+          )}
         </TouchableOpacity>
         <View style={styles.secondaryButtons}>
           <TouchableOpacity
@@ -240,12 +384,7 @@ export default function BagScanScreen({
       <ManualEntryModal
         visible={showManualModal}
         onClose={() => setShowManualModal(false)}
-        onSubmit={(bagCode) => {
-          console.log('Manual entry submitted:', bagCode);
-          setShowManualModal(false);
-          onManualEntry?.();
-          // Handle the bag code submission here
-        }}
+        onSubmit={handleManualEntry}
       />
     </View>
   );
@@ -470,5 +609,18 @@ const styles = StyleSheet.create({
     ...typography.c1,
     fontWeight: '700',
     color: colors.text.primary,
+  },
+  errorContainer: {
+    backgroundColor: colorWithOpacity.error(0.1),
+    borderWidth: 1,
+    borderColor: colors.error,
+    borderRadius: radius.small,
+    padding: spacing.s,
+    marginBottom: spacing.s,
+  },
+  errorText: {
+    ...typography.b2,
+    color: colors.error,
+    textAlign: 'center',
   },
 });

@@ -62,9 +62,21 @@ hhd-app/
 │   ├── components/         # Screens & shared UI
 │   │   ├── design-system/  # Card, Button, TextField
 │   │   └── icons/          # SVG-based icons
+│   ├── services/           # API service layer
+│   ├── contexts/           # React contexts (Auth)
+│   ├── hooks/              # Custom React hooks
+│   ├── utils/              # Utility functions
 │   └── design-system/
 │       └── tokens.ts       # Spacing, colors, typography, radius
+├── HHD-APP-Backend/        # Backend API server
+│   ├── src/
+│   │   ├── api/            # Routes & controllers
+│   │   ├── models/         # MongoDB models
+│   │   ├── services/       # Business logic
+│   │   └── middleware/    # Express middleware
+│   └── scripts/             # Database seeding scripts
 ├── assets/                 # Images, logos, splash
+├── docs/                   # Documentation & guides
 └── temp_icons/             # Icon source assets
 ```
 

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Modal,
+  Alert,
 } from 'react-native';
 import { CameraView, BarcodeScanningResult } from 'expo-camera';
 import Header from './Header';
@@ -22,6 +23,9 @@ import ReportIssueModal from './ReportIssueModal';
 import PausePickingModal from './PausePickingModal';
 import OrderDetailsModal from './OrderDetailsModal';
 import CancelOrderModal from './CancelOrderModal';
+import { scannedItemService } from '../services/scannedItem.service';
+import { itemService, Item as ApiItem } from '../services/item.service';
+import { orderService } from '../services/order.service';
 import {
   colors,
   typography,
@@ -53,24 +57,55 @@ interface ActivePickSessionScreenProps {
   onOrderComplete?: (completedItems: OrderItem[]) => void;
 }
 
-// Sample order items queue
-const generateOrderItems = (itemCount: number): OrderItem[] => {
-  const items: OrderItem[] = [
-    { id: '1', name: 'Onion', crateId: '35C8ADNE002457A_A', quantity: 3, grammage: '3 kg', mrp: '-', expiryDate: '28 May 2025', bin: 'NGE-I-3-A-1' },
-    { id: '2', name: 'Tomato', crateId: '35C8ADNE002457B_B', quantity: 2, grammage: '2 kg', mrp: '₹120', expiryDate: '30 May 2025', bin: 'NGE-I-3-A-2' },
-    { id: '3', name: 'Potato', crateId: '35C8ADNE002457C_C', quantity: 5, grammage: '5 kg', mrp: '₹150', expiryDate: '25 May 2025', bin: 'NGE-I-3-A-3' },
-    { id: '4', name: 'Carrot', crateId: '35C8ADNE002457D_D', quantity: 2, grammage: '1 kg', mrp: '₹80', expiryDate: '27 May 2025', bin: 'NGE-I-3-A-4' },
-    { id: '5', name: 'Capsicum', crateId: '35C8ADNE002457E_E', quantity: 1, grammage: '500g', mrp: '₹60', expiryDate: '29 May 2025', bin: 'NGE-I-3-A-5' },
-  ];
-  
-  // Repeat items to match itemCount
-  const repeatedItems: OrderItem[] = [];
-  let itemIndex = 0;
-  for (let i = 0; i < itemCount; i++) {
-    repeatedItems.push({ ...items[itemIndex % items.length], id: `${i + 1}` });
-    itemIndex++;
+// Helper function to map API items to OrderItem format
+// Handles both Item model items and items from assignorders (which may have more fields)
+const mapApiItemsToOrderItems = (apiItems: any[]): OrderItem[] => {
+  return apiItems.map((item, index) => {
+    // Generate crateId from itemCode, itemId, or use a default format
+    const crateId = (item as any).crateId || item.itemId || item.itemCode || `CRATE-${item._id || index}`;
+    
+    // Use location as bin, or generate from itemCode
+    const bin = (item as any).bin || item.location || `BIN-${item.itemCode || index}`;
+    
+    // Check if item has grammage, mrp, expiryDate from assignorders or extended fields
+    const grammage = (item as any).grammage || getDefaultGrammage(item.name, item.category);
+    const mrp = (item as any).mrp || getDefaultMRP();
+    const expiryDate = (item as any).expiryDate || getDefaultExpiryDate();
+    
+    return {
+      id: item._id || item.itemId || String(index),
+      name: item.name,
+      crateId,
+      quantity: item.quantity || 1,
+      grammage,
+      mrp,
+      expiryDate,
+      bin,
+    };
+  });
+};
+
+// Default values for missing fields - these should ideally come from the backend
+// For now, we'll use sensible defaults based on item name/category
+const getDefaultGrammage = (name: string, category?: string): string => {
+  // Simple heuristic based on category and name
+  if (category === 'Fresh') {
+    if (name.toLowerCase().includes('onion') || name.toLowerCase().includes('potato')) {
+      return '1 kg';
+    }
+    return '500g';
   }
-  return repeatedItems;
+  return '1 kg';
+};
+
+const getDefaultMRP = (): string => {
+  return '₹0';
+};
+
+const getDefaultExpiryDate = (): string => {
+  const date = new Date();
+  date.setDate(date.getDate() + 7); // 7 days from now
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
 export default function ActivePickSessionScreen({
@@ -93,10 +128,53 @@ export default function ActivePickSessionScreen({
   const [showPausePickingModal, setShowPausePickingModal] = useState(false);
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [showCancelOrderModal, setShowCancelOrderModal] = useState(false);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const cameraRef = useRef<CameraView>(null);
 
-  // Generate order items queue
-  const orderItems = useMemo(() => generateOrderItems(itemCount), [itemCount]);
+  // Fetch order items from API
+  useEffect(() => {
+    const fetchOrderItems = async () => {
+      try {
+        setLoading(true);
+        // Try to get order with items first (might have more complete data)
+        let apiItems: ApiItem[] = [];
+        
+        try {
+          const orderResponse = await orderService.getOrder(orderId);
+          if (orderResponse.items && orderResponse.items.length > 0) {
+            apiItems = orderResponse.items;
+          }
+        } catch (error) {
+          console.log('Could not fetch order with items, trying items endpoint...');
+        }
+        
+        // If no items from order endpoint, try items endpoint
+        if (apiItems.length === 0) {
+          apiItems = await itemService.getItemsByOrder(orderId);
+        }
+        
+        // Map API items to OrderItem format
+        const mappedItems = mapApiItemsToOrderItems(apiItems);
+        setOrderItems(mappedItems);
+      } catch (error) {
+        console.error('Failed to fetch order items:', error);
+        // Fallback to empty array - component will show loading state
+        setOrderItems([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (orderId && orderId !== 'ORD-45621') {
+      fetchOrderItems();
+    } else {
+      // For default/test order, use empty array (or could use static data as fallback)
+      setOrderItems([]);
+      setLoading(false);
+    }
+  }, [orderId]);
+
   const currentOrderItem = orderItems[currentItemIndex];
   const totalQuantity = currentOrderItem?.quantity || 1;
 
@@ -119,9 +197,9 @@ export default function ActivePickSessionScreen({
 
   // Calculate remaining unique items in the order
   // currentItemIndex is 0-based, so remaining = total - currentIndex
-  // When on item 1 (index 0): remaining = 18 - 0 = 18 items
-  // When on item 2 (index 1): remaining = 18 - 1 = 17 items
-  const remainingItems = itemCount - currentItemIndex;
+  // When on item 1 (index 0): remaining = total - 0 = total items
+  // When on item 2 (index 1): remaining = total - 1 = total - 1 items
+  const remainingItems = orderItems.length - currentItemIndex;
   
   // Calculate current item position in the order (1-based)
   const currentItemPosition = currentItemIndex + 1;
@@ -150,7 +228,7 @@ export default function ActivePickSessionScreen({
   // Current item data
   const currentItem = currentOrderItem ? {
     crateId: currentOrderItem.crateId,
-    sku: `${currentItemPosition} of ${itemCount}`, // Current item position in order
+    sku: `${currentItemPosition} of ${orderItems.length}`, // Current item position in order
     name: currentOrderItem.name,
     imageUrl: `https://via.placeholder.com/84x84?text=${encodeURIComponent(currentOrderItem.name)}`,
     grammage: currentOrderItem.grammage,
@@ -173,12 +251,43 @@ export default function ActivePickSessionScreen({
   };
 
   // Handle barcode scanned
-  const handleBarcodeScanned = ({ data, type }: BarcodeScanningResult) => {
+  const handleBarcodeScanned = async ({ data, type }: BarcodeScanningResult) => {
     if (isScanning && (type === 'qr' || type === 'ean13' || type === 'ean8' || type === 'code128')) {
-      console.log('Item scanned:', data);
+      console.log('Item scanned:', data, 'Type:', type);
       
-      // Disable scanner
+      // Disable scanner immediately to prevent multiple scans
       setIsScanning(false);
+      
+      try {
+        // Save scanned item to database
+        // Each scan represents 1 unit, so quantity is always 1 per scan
+        await scannedItemService.createScannedItem({
+          barcodeData: data,
+          barcodeType: type,
+          orderId: orderId,
+          deviceId: 'HHD-0234', // TODO: Get from device or user settings
+          metadata: {
+            itemName: currentOrderItem?.name,
+            quantity: 1, // Each scan is 1 unit
+            grammage: currentOrderItem?.grammage,
+            mrp: currentOrderItem?.mrp,
+            expiryDate: currentOrderItem?.expiryDate,
+            crateId: currentOrderItem?.crateId,
+            location: currentOrderItem?.bin,
+            zone: zone,
+          },
+        });
+        
+        console.log('✅ Scanned item saved to database');
+      } catch (error: any) {
+        console.error('❌ Failed to save scanned item:', error);
+        // Show error but don't block the flow
+        Alert.alert(
+          'Save Warning',
+          'Item scanned but failed to save to database. Please check your connection.',
+          [{ text: 'OK' }]
+        );
+      }
       
       // Increment scanned count
       const newScannedCount = scannedCount + 1;
@@ -186,6 +295,8 @@ export default function ActivePickSessionScreen({
       
       // If all items of current type are scanned, move to next item
       if (newScannedCount >= totalQuantity) {
+        // Add the required quantity to total scanned items
+        // This ensures we only count the required quantity, not any extra scans
         const newTotalScanned = totalScannedItems + totalQuantity;
         setTotalScannedItems(newTotalScanned);
         
@@ -206,8 +317,8 @@ export default function ActivePickSessionScreen({
     }
   };
 
-  // Show loading if no current item
-  if (!currentItem || !currentOrderItem) {
+  // Show loading if fetching data or no current item
+  if (loading || !currentItem || !currentOrderItem) {
     return (
       <View style={styles.container}>
         <Header
@@ -217,7 +328,9 @@ export default function ActivePickSessionScreen({
           time={currentTime || '6:39 PM'}
         />
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={styles.loadingText}>
+            {loading ? 'Loading order items...' : 'No items found'}
+          </Text>
         </View>
       </View>
     );
@@ -782,8 +895,8 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   scanningText: {
-    fontFamily: 'Consolas',
     ...typography.bodyLarge,
+    fontFamily: 'Consolas',
     fontWeight: '700',
     color: colors.success,
     marginTop: spacing.xl,

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import Header from './Header';
 import { useBatteryLevel } from '../hooks/useBatteryLevel';
@@ -20,6 +21,7 @@ import {
   shadows,
   layout,
 } from '../design-system/tokens';
+import { statisticsService, TaskStatistics } from '../services/statistics.service';
 
 interface TasksScreenProps {
   onNavigate?: (screen: 'home' | 'tasks' | 'profile') => void;
@@ -28,6 +30,9 @@ interface TasksScreenProps {
 export default function TasksScreen({ onNavigate }: TasksScreenProps) {
   const batteryLevel = useBatteryLevel();
   const [currentTime, setCurrentTime] = useState('');
+  const [statistics, setStatistics] = useState<TaskStatistics | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const updateTime = () => {
@@ -46,6 +51,42 @@ export default function TasksScreen({ onNavigate }: TasksScreenProps) {
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch statistics
+  useEffect(() => {
+    const fetchStatistics = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const stats = await statisticsService.getTaskStatistics();
+        setStatistics(stats);
+      } catch (err: any) {
+        console.error('Failed to fetch statistics:', err);
+        setError(err.message || 'Failed to load statistics');
+        // Set default values on error
+        setStatistics({
+          ordersCompleted: 0,
+          averagePickTime: '0s',
+          accuracy: 0,
+          slaCompliance: 0,
+          todayActivity: {
+            itemsPicked: 0,
+            activeTime: '0m',
+            efficiencyRate: 0,
+          },
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStatistics();
+
+    // Refresh statistics every 30 seconds
+    const refreshInterval = setInterval(fetchStatistics, 30000);
+
+    return () => clearInterval(refreshInterval);
+  }, []);
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -60,90 +101,111 @@ export default function TasksScreen({ onNavigate }: TasksScreenProps) {
           <Text style={styles.title}>MY TASKS</Text>
         </View>
 
-        {/* Stats Cards */}
-        <View style={styles.statsRow}>
-          {/* Orders Completed */}
-          <View style={styles.statCard}>
-            <View style={styles.statIconContainer}>
-              <CheckIcon width={35} height={35} color={colors.success} />
-            </View>
-            <Text style={styles.statValue}>42</Text>
-            <Text style={styles.statLabel}>Orders Completed</Text>
+        {/* Loading State */}
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading statistics...</Text>
           </View>
+        )}
 
-          {/* Avg Pick Time */}
-          <View style={styles.statCard}>
-            <View style={styles.statIconContainer}>
-              <View style={styles.clockIcon}>
-                <View style={styles.clockHand} />
-              </View>
-            </View>
-            <Text style={styles.statValue}>2m 14s</Text>
-            <Text style={styles.statLabel}>Avg Pick Time</Text>
+        {/* Error State */}
+        {error && !isLoading && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>⚠️ {error}</Text>
           </View>
-        </View>
+        )}
+
+        {/* Stats Cards */}
+        {!isLoading && statistics && (
+          <View style={styles.statsRow}>
+            {/* Orders Completed */}
+            <View style={styles.statCard}>
+              <View style={styles.statIconContainer}>
+                <CheckIcon width={35} height={35} color={colors.success} />
+              </View>
+              <Text style={styles.statValue}>{statistics.ordersCompleted}</Text>
+              <Text style={styles.statLabel}>Orders Completed</Text>
+            </View>
+
+            {/* Avg Pick Time */}
+            <View style={styles.statCard}>
+              <View style={styles.statIconContainer}>
+                <View style={styles.clockIcon}>
+                  <View style={styles.clockHand} />
+                </View>
+              </View>
+              <Text style={styles.statValue}>{statistics.averagePickTime}</Text>
+              <Text style={styles.statLabel}>Avg Pick Time</Text>
+            </View>
+          </View>
+        )}
 
         {/* Performance Section */}
-        <View style={styles.performanceCard}>
-          <View style={styles.sectionHeader}>
-            <CheckIcon width={21} height={21} color={colors.success} />
-            <Text style={styles.sectionTitle}>Performance</Text>
-          </View>
-
-          <View style={styles.performanceContent}>
-            {/* Accuracy */}
-            <View style={styles.performanceItem}>
-              <View style={styles.performanceRow}>
-                <Text style={styles.performanceLabel}>Accuracy</Text>
-                <Text style={styles.performanceValue}>98%</Text>
-              </View>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: '98%' }]} />
-              </View>
+        {!isLoading && statistics && (
+          <View style={styles.performanceCard}>
+            <View style={styles.sectionHeader}>
+              <CheckIcon width={21} height={21} color={colors.success} />
+              <Text style={styles.sectionTitle}>Performance</Text>
             </View>
 
-            {/* SLA Compliance */}
-            <View style={styles.performanceItem}>
-              <View style={styles.performanceRow}>
-                <Text style={styles.performanceLabel}>SLA Compliance</Text>
-                <Text style={styles.performanceValue}>100%</Text>
+            <View style={styles.performanceContent}>
+              {/* Accuracy */}
+              <View style={styles.performanceItem}>
+                <View style={styles.performanceRow}>
+                  <Text style={styles.performanceLabel}>Accuracy</Text>
+                  <Text style={styles.performanceValue}>{statistics.accuracy}%</Text>
+                </View>
+                <View style={styles.progressBar}>
+                  <View style={[styles.progressFill, { width: `${statistics.accuracy}%` }]} />
+                </View>
               </View>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: '100%' }]} />
+
+              {/* SLA Compliance */}
+              <View style={styles.performanceItem}>
+                <View style={styles.performanceRow}>
+                  <Text style={styles.performanceLabel}>SLA Compliance</Text>
+                  <Text style={styles.performanceValue}>{statistics.slaCompliance}%</Text>
+                </View>
+                <View style={styles.progressBar}>
+                  <View style={[styles.progressFill, { width: `${statistics.slaCompliance}%` }]} />
+                </View>
               </View>
             </View>
           </View>
-        </View>
+        )}
 
         {/* Today's Activity Section */}
-        <View style={styles.activityCard}>
-          <View style={styles.sectionHeader}>
-            <TasksIcon width={21} height={21} color={colors.primary} />
-            <Text style={styles.sectionTitle}>Today's Activity</Text>
+        {!isLoading && statistics && (
+          <View style={styles.activityCard}>
+            <View style={styles.sectionHeader}>
+              <TasksIcon width={21} height={21} color={colors.primary} />
+              <Text style={styles.sectionTitle}>Today's Activity</Text>
+            </View>
+
+            <View style={styles.activityContent}>
+              {/* Items Picked */}
+              <View style={styles.activityRow}>
+                <Text style={styles.activityLabel}>Items Picked</Text>
+                <Text style={styles.activityValue}>{statistics.todayActivity.itemsPicked}</Text>
+              </View>
+
+              {/* Active Time */}
+              <View style={styles.activityRow}>
+                <Text style={styles.activityLabel}>Active Time</Text>
+                <Text style={styles.activityValue}>{statistics.todayActivity.activeTime}</Text>
+              </View>
+
+              {/* Efficiency Rate */}
+              <View style={styles.activityRow}>
+                <Text style={styles.activityLabel}>Efficiency Rate</Text>
+                <Text style={[styles.activityValue, styles.efficiencyValue]}>
+                  {statistics.todayActivity.efficiencyRate}%
+                </Text>
+              </View>
+            </View>
           </View>
-
-          <View style={styles.activityContent}>
-            {/* Items Picked */}
-            <View style={styles.activityRow}>
-              <Text style={styles.activityLabel}>Items Picked</Text>
-              <Text style={styles.activityValue}>156</Text>
-            </View>
-
-            {/* Active Time */}
-            <View style={styles.activityRow}>
-              <Text style={styles.activityLabel}>Active Time</Text>
-              <Text style={styles.activityValue}>6h 23m</Text>
-            </View>
-
-            {/* Efficiency Rate */}
-            <View style={styles.activityRow}>
-              <Text style={styles.activityLabel}>Efficiency Rate</Text>
-              <Text style={[styles.activityValue, styles.efficiencyValue]}>
-                97%
-              </Text>
-            </View>
-          </View>
-        </View>
+        )}
       </ScrollView>
 
       {/* Bottom Navigation */}
@@ -354,6 +416,35 @@ const styles = StyleSheet.create({
   },
   efficiencyValue: {
     color: colors.success,
+  },
+  loadingContainer: {
+    padding: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.l,
+  },
+  loadingText: {
+    ...typography.b1,
+    color: colors.text.secondary,
+    marginTop: spacing.m,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  errorContainer: {
+    padding: spacing.m,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.borderLight,
+    borderRadius: radius.medium,
+    marginBottom: spacing.l,
+    alignItems: 'center',
+  },
+  errorText: {
+    ...typography.b1,
+    color: colors.text.secondary,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
   },
   bottomNav: {
     position: 'absolute',

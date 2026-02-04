@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Logo from './Logo';
@@ -22,6 +23,7 @@ import {
   shadows,
   layout,
 } from '../design-system/tokens';
+import { useAuth } from '../contexts/AuthContext';
 
 interface OTPScreenProps {
   mobileNumber: string;
@@ -37,9 +39,12 @@ export default function OTPScreen({
   onResend,
 }: OTPScreenProps) {
   const batteryLevel = useBatteryLevel();
+  const { login, sendOTP } = useAuth();
   const [otp, setOtp] = useState(['', '', '', '']);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
   const [error, setError] = useState<string | undefined>();
+  const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   useEffect(() => {
@@ -148,7 +153,7 @@ export default function OTPScreen({
   const isValidOtp = isOtpValid(otp);
   const canResend = timeLeft === 0;
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (!isOtpComplete) {
       return;
     }
@@ -158,18 +163,88 @@ export default function OTPScreen({
       return;
     }
     
+    setLoading(true);
     setError(undefined);
-    if (onVerify) {
-      onVerify(otp.join(''));
+
+    try {
+      const otpString = otp.join('');
+      console.log('[OTP Screen] Verifying OTP for mobile:', mobileNumber);
+      
+      // Verify OTP via backend
+      await login(mobileNumber, otpString);
+      
+      console.log('[OTP Screen] OTP verified successfully');
+      
+      // Show success message
+      Alert.alert(
+        'Success',
+        'OTP verified successfully!',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Call parent callback to navigate to next screen
+              if (onVerify) {
+                onVerify(otpString);
+              }
+            },
+          },
+        ],
+        { cancelable: false }
+      );
+    } catch (error: any) {
+      console.error('[OTP Screen] OTP verification failed:', error);
+      
+      // Determine error message
+      let errorMessage = 'Invalid OTP. Please try again.';
+      
+      if (error.message) {
+        if (error.message.includes('Invalid') || error.message.includes('expired')) {
+          errorMessage = 'Wrong OTP. Please check and try again.';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Request timeout. Please check your connection and try again.';
+        } else if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setError(errorMessage);
+      
+      // Clear OTP inputs on error (keep error visible)
+      setOtp(['', '', '', '']);
+      inputRefs.current[0]?.focus();
+      
+      // Show alert
+      Alert.alert('Verification Failed', errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleResend = () => {
-    if (canResend && onResend) {
+  const handleResend = async () => {
+    if (!canResend) {
+      return;
+    }
+
+    setResending(true);
+    setError(undefined);
+
+    try {
+      await sendOTP(mobileNumber);
       setTimeLeft(300);
       setOtp(['', '', '', '']);
       inputRefs.current[0]?.focus();
-      onResend();
+      
+      // Call parent callback if provided
+      if (onResend) {
+        onResend();
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to resend OTP. Please try again.');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -234,7 +309,7 @@ export default function OTPScreen({
               ))}
             </View>
 
-            {error && isOtpComplete && (
+            {error && (
               <Text style={styles.errorText}>{error}</Text>
             )}
 
@@ -248,14 +323,16 @@ export default function OTPScreen({
             <TouchableOpacity
               style={[
                 styles.verifyButton,
-                (!isOtpComplete || !isValidOtp) && styles.verifyButtonDisabled,
+                (!isOtpComplete || !isValidOtp || loading) && styles.verifyButtonDisabled,
               ]}
               onPress={handleVerify}
-              disabled={!isOtpComplete || !isValidOtp}
+              disabled={!isOtpComplete || !isValidOtp || loading}
               activeOpacity={0.8}
             >
               <CheckIcon width={14} height={14} />
-              <Text style={styles.verifyButtonText}>VERIFY & CONTINUE</Text>
+              <Text style={styles.verifyButtonText}>
+                {loading ? 'VERIFYING...' : 'VERIFY & CONTINUE'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -263,15 +340,15 @@ export default function OTPScreen({
           <TouchableOpacity
             style={styles.resendButton}
             onPress={handleResend}
-            disabled={!canResend}
+            disabled={!canResend || resending}
           >
             <Text
               style={[
                 styles.resendText,
-                !canResend && styles.resendTextDisabled,
+                (!canResend || resending) && styles.resendTextDisabled,
               ]}
             >
-              Didn't receive code? Resend
+              {resending ? 'Resending...' : "Didn't receive code? Resend"}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -384,7 +461,9 @@ const styles = StyleSheet.create({
     ...typography.b2,
     color: colors.error,
     textAlign: 'center',
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    fontWeight: '600',
   },
   timerText: {
     ...typography.b2,

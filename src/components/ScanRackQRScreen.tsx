@@ -5,12 +5,14 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { CameraView, BarcodeScanningResult } from 'expo-camera';
 import Header from './Header';
 import { useBatteryLevel } from '../hooks/useBatteryLevel';
 import ScannerIcon from './icons/ScannerIcon';
 import CameraViewfinderIcon from './icons/CameraViewfinderIcon';
+import { rackService } from '../services/rack.service';
 import {
   colors,
   typography,
@@ -27,7 +29,7 @@ interface ScanRackQRScreenProps {
   rackLocation?: string;
   riderName?: string;
   onBack?: () => void;
-  onScanComplete?: () => void;
+  onScanComplete?: (rackLocation?: string) => void;
 }
 
 export default function ScanRackQRScreen({
@@ -41,6 +43,8 @@ export default function ScanRackQRScreen({
   const batteryLevel = useBatteryLevel();
   const [currentTime, setCurrentTime] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | undefined>();
   const cameraRef = useRef<CameraView>(null);
 
   useEffect(() => {
@@ -64,13 +68,79 @@ export default function ScanRackQRScreen({
     setIsScanning(true);
   };
 
-  const handleBarcodeScanned = ({ data, type }: BarcodeScanningResult) => {
-    if (isScanning && type === 'qr') {
+  /**
+   * Validate QR code format: Rack-{identifier}-Slot{number} ({rider name})
+   * Example: Rack-D1-Slot3 (John Doe)
+   */
+  const validateQRFormat = (qrData: string): boolean => {
+    if (!qrData || typeof qrData !== 'string') {
+      return false;
+    }
+    
+    const trimmed = qrData.trim();
+    // Strict format validation: Rack-{identifier}-Slot{number} ({rider name})
+    const fullPattern = /^Rack-([A-Z0-9]+)-Slot(\d+)\s+\(([^)]+)\)$/i;
+    return fullPattern.test(trimmed);
+  };
+
+  const handleBarcodeScanned = async ({ data, type }: BarcodeScanningResult) => {
+    if (isScanning && type === 'qr' && !isSubmitting) {
       console.log('Rack QR Code scanned:', data);
       setIsScanning(false);
-      // Validate the scanned QR code matches expected format
-      // For now, proceed to next screen
-      onScanComplete?.();
+      setIsSubmitting(true);
+      setError(undefined);
+
+      try {
+        // Validate QR code format
+        if (!validateQRFormat(data)) {
+          throw new Error(
+            'Invalid QR code format. Expected format: Rack-{identifier}-Slot{number} ({rider name})\nExample: Rack-D1-Slot3 (John Doe)'
+          );
+        }
+
+        // Call API to scan rack and insert into database
+        const rack = await rackService.scanRack({
+          qrCode: data,
+          orderId: orderId,
+        });
+
+        console.log('✅ Rack scanned and saved to database:', rack);
+        
+        // Show success message
+        Alert.alert(
+          'Rack Scanned Successfully',
+          `Rack Code: ${rack.rackCode}\nLocation: ${rack.location}\nZone: ${rack.zone}`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                setIsSubmitting(false);
+                // Pass rack location back to parent component
+                onScanComplete?.(rack.location || rack.rackCode); // Navigate to next screen after successful scan
+              },
+            },
+          ]
+        );
+      } catch (error: any) {
+        console.error('❌ Error scanning rack:', error);
+        const errorMessage = error.message || 'Failed to scan rack. Please try again.';
+        setError(errorMessage);
+        setIsSubmitting(false);
+        
+        // Show error alert
+        Alert.alert(
+          'Scan Failed',
+          errorMessage,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Allow user to scan again
+              },
+            },
+          ]
+        );
+      }
     }
   };
 
@@ -104,6 +174,11 @@ export default function ScanRackQRScreen({
             <Text style={styles.subtitle}>
               📍 {rackLocation} ({riderName})
             </Text>
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>❌ {error}</Text>
+              </View>
+            )}
           </View>
 
           {/* Scanner Preview Area */}
@@ -166,14 +241,21 @@ export default function ScanRackQRScreen({
       {/* Footer Button */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.scanButton, isScanning && styles.scanButtonDisabled]}
+          style={[
+            styles.scanButton,
+            (isScanning || isSubmitting) && styles.scanButtonDisabled,
+          ]}
           onPress={handleStartScan}
           activeOpacity={0.8}
-          disabled={isScanning}
+          disabled={isScanning || isSubmitting}
         >
           <ScannerIcon width={14} height={14} />
           <Text style={styles.scanButtonText}>
-            {isScanning ? 'SCANNING...' : 'SCAN RACK QR'}
+            {isSubmitting
+              ? 'PROCESSING...'
+              : isScanning
+              ? 'SCANNING...'
+              : 'SCAN RACK QR'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -230,6 +312,21 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: colors.text.secondary,
     textAlign: 'center',
+  },
+  errorContainer: {
+    marginTop: spacing.s,
+    padding: spacing.s,
+    backgroundColor: colorWithOpacity.error(0.1),
+    borderRadius: radius.small,
+    borderWidth: 1,
+    borderColor: colorWithOpacity.error(0.3),
+  },
+  errorText: {
+    ...typography.c1,
+    fontWeight: '600',
+    color: colors.error,
+    textAlign: 'center',
+    fontSize: 12,
   },
   scannerContainer: {
     marginTop: spacing.xl + spacing.s, // 32px from title section

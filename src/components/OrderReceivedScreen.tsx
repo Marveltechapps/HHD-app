@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import Header from './Header';
 import { useBatteryLevel } from '../hooks/useBatteryLevel';
@@ -13,6 +14,10 @@ import HomeIcon from './icons/HomeIcon';
 import TasksIcon from './icons/TasksIcon';
 import ProfileIcon from './icons/ProfileIcon';
 import TargetIcon from './icons/TargetIcon';
+import { orderService, Order } from '../services/order.service';
+import { statisticsService } from '../services/statistics.service';
+import { useAuth } from '../contexts/AuthContext';
+import { authService, UserProfileResponse } from '../services/auth.service';
 import {
   colors,
   typography,
@@ -24,7 +29,7 @@ import {
 } from '../design-system/tokens';
 
 interface OrderReceivedScreenProps {
-  onStartPicking?: () => void;
+  onStartPicking?: (order?: Order) => void;
   onNavigate?: (screen: 'home' | 'tasks' | 'profile') => void;
 }
 
@@ -33,7 +38,14 @@ export default function OrderReceivedScreen({
   onNavigate,
 }: OrderReceivedScreenProps) {
   const batteryLevel = useBatteryLevel();
+  const { isAuthenticated, user } = useAuth();
   const [currentTime, setCurrentTime] = useState('');
+  const [todayCompletedCount, setTodayCompletedCount] = useState(0);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [profileData, setProfileData] = useState<UserProfileResponse | null>(null);
 
   useEffect(() => {
     const updateTime = () => {
@@ -52,6 +64,106 @@ export default function OrderReceivedScreen({
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch user profile data
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!isAuthenticated || !user) {
+        setProfileData(null);
+        return;
+      }
+
+      try {
+        const profile = await authService.getProfile();
+        setProfileData(profile);
+      } catch (error) {
+        console.error('[OrderReceivedScreen] Error fetching profile:', error);
+        setProfileData(null);
+      }
+    };
+
+    fetchProfile();
+  }, [isAuthenticated, user]);
+
+  // Fetch pending orders from assignorders collection
+  useEffect(() => {
+    const fetchPendingOrders = async () => {
+      if (!isAuthenticated) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError(null);
+        console.log('[OrderReceivedScreen] Fetching pending assignorders...');
+        const response = await orderService.getAssignOrdersByStatus('pending');
+        console.log('[OrderReceivedScreen] Received orders:', response);
+        console.log('[OrderReceivedScreen] Number of orders:', response?.length || 0);
+        setPendingOrders(response || []);
+      } catch (err: any) {
+        console.error('[OrderReceivedScreen] Error fetching pending assignorders:', err);
+        setError(err.message || 'Failed to load orders');
+        setPendingOrders([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPendingOrders();
+  }, [isAuthenticated]);
+
+  // Fetch today's completed orders count
+  useEffect(() => {
+    const fetchTodayCompletedCount = async () => {
+      if (!isAuthenticated) {
+        setTodayCompletedCount(0);
+        return;
+      }
+
+      try {
+        const count = await statisticsService.getTodayCompletedOrdersCount();
+        setTodayCompletedCount(count);
+      } catch (error) {
+        console.error('[OrderReceivedScreen] Error fetching today completed count:', error);
+        setTodayCompletedCount(0);
+      }
+    };
+
+    fetchTodayCompletedCount();
+
+    // Refresh every 30 seconds
+    const refreshInterval = setInterval(fetchTodayCompletedCount, 30000);
+
+    return () => clearInterval(refreshInterval);
+  }, [isAuthenticated]);
+
+  const handleOrderSelect = (orderId: string) => {
+    setSelectedOrderId(selectedOrderId === orderId ? null : orderId);
+  };
+
+  // Format zone display (e.g., "A" -> "Zone A", "Zone B" -> "Zone B")
+  const formatZone = (zone: string): string => {
+    if (zone.startsWith('Zone ')) {
+      return zone;
+    }
+    return `Zone ${zone}`;
+  };
+
+  const handleStartPickingPress = () => {
+    if (selectedOrderId && onStartPicking) {
+      // Find the selected order object
+      const selectedOrder = pendingOrders.find(order => order.orderId === selectedOrderId);
+      if (selectedOrder) {
+        onStartPicking(selectedOrder);
+      } else {
+        onStartPicking();
+      }
+    }
+  };
+
+  // Get display name from profile data or user context
+  const displayName = profileData?.name || user?.name || 'User';
+
   return (
     <View style={styles.container}>
       {/* Header with Time */}
@@ -69,11 +181,11 @@ export default function OrderReceivedScreen({
         {/* Dashboard Card */}
         <Card style={styles.dashboardCard} padding="l" gap="sm">
           <View style={styles.dashboardHeader}>
-            <Text style={styles.userName}>👤 Rahul Kumar</Text>
+            <Text style={styles.userName}>👤 {displayName}</Text>
             <Text style={styles.targetText}>🎯 Target: 50 orders</Text>
           </View>
           <View style={styles.statsContainer}>
-            <Text style={styles.statText}>📊 TODAY: 0 complete</Text>
+            <Text style={styles.statText}>📊 TODAY: {todayCompletedCount} complete</Text>
             <Text style={styles.statSeparator}>|</Text>
             <Text style={styles.statText}>100%</Text>
             <Text style={styles.statSeparator}>|</Text>
@@ -81,29 +193,84 @@ export default function OrderReceivedScreen({
           </View>
         </Card>
 
-        {/* Order Card */}
-        <View style={styles.orderCard}>
-          <View style={styles.orderHeader}>
-            <TargetIcon width={17.5} height={17.5} color={colors.success} />
-            <Text style={styles.orderTitle}>
-              🎯 NEW ORDER: ORD-45621 (18 items)
-            </Text>
+        {/* Loading State */}
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading orders...</Text>
           </View>
-          <Text style={styles.orderDetail}>
-            📦 Zone B start | Target: 55s
-          </Text>
-          <Text style={styles.orderDetail}>👝 Scan bag to start</Text>
-        </View>
+        )}
+
+        {/* Error State */}
+        {error && !isLoading && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>⚠️ {error}</Text>
+          </View>
+        )}
+
+        {/* No Orders State */}
+        {!isLoading && !error && pendingOrders.length === 0 && (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No pending orders available</Text>
+          </View>
+        )}
+
+        {/* Order Cards */}
+        {!isLoading && !error && pendingOrders.map((order) => (
+          <TouchableOpacity
+            key={order._id || order.orderId}
+            style={[
+              styles.orderCard,
+              selectedOrderId === order.orderId && styles.orderCardSelected,
+              pendingOrders.length > 1 && styles.orderCardWithMargin,
+            ]}
+            onPress={() => handleOrderSelect(order.orderId)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.orderHeader}>
+              <TargetIcon
+                width={17.5}
+                height={17.5}
+                color={
+                  selectedOrderId === order.orderId ? colors.primary : colors.success
+                }
+              />
+              <Text
+                style={[
+                  styles.orderTitle,
+                  selectedOrderId === order.orderId && styles.orderTitleSelected,
+                ]}
+              >
+                🎯 NEW ORDER: {order.orderId} ({order.itemCount} items)
+              </Text>
+            </View>
+            <Text style={styles.orderDetail}>
+              📦 {formatZone(order.zone)} start | Target: {order.targetTime || 0}s
+            </Text>
+            <Text style={styles.orderDetail}>👝 Scan bag to start</Text>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
 
       {/* Start Picking Button */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={styles.startButton}
-          onPress={onStartPicking}
+          style={[
+            styles.startButton,
+            !selectedOrderId && styles.startButtonDisabled,
+          ]}
+          onPress={handleStartPickingPress}
           activeOpacity={0.8}
+          disabled={!selectedOrderId}
         >
-          <Text style={styles.startButtonText}>START PICKING →</Text>
+          <Text
+            style={[
+              styles.startButtonText,
+              !selectedOrderId && styles.startButtonTextDisabled,
+            ]}
+          >
+            START PICKING →
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -190,6 +357,11 @@ const styles = StyleSheet.create({
     gap: spacing.xs, // 4px (closest to 3.5px)
     width: '100%',
   },
+  orderCardSelected: {
+    backgroundColor: colorWithOpacity.primary(0.1),
+    borderColor: colors.primary,
+    borderBottomColor: colors.primary,
+  },
   orderHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -201,9 +373,48 @@ const styles = StyleSheet.create({
     color: colors.success,
     flex: 1,
   },
+  orderTitleSelected: {
+    color: colors.primary,
+  },
   orderDetail: {
     ...typography.c2,
     color: colors.text.secondary,
+  },
+  orderCardWithMargin: {
+    marginBottom: spacing.m, // 16px spacing between multiple cards
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing['2xl'], // 32px
+  },
+  loadingText: {
+    ...typography.b2,
+    color: colors.text.secondary,
+    marginTop: spacing.m, // 16px
+  },
+  errorContainer: {
+    backgroundColor: colorWithOpacity.error(0.1),
+    borderWidth: 2,
+    borderColor: colors.error,
+    borderRadius: radius.medium,
+    padding: spacing.m,
+    marginBottom: spacing.m,
+  },
+  errorText: {
+    ...typography.b2,
+    color: colors.error,
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing['2xl'],
+  },
+  emptyText: {
+    ...typography.b2,
+    color: colors.text.secondary,
+    textAlign: 'center',
   },
   buttonContainer: {
     position: 'absolute',
@@ -224,11 +435,18 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     ...shadows.large,
   },
+  startButtonDisabled: {
+    backgroundColor: colors.grayMedium,
+    ...shadows.card,
+  },
   startButtonText: {
     ...typography.b1,
     fontWeight: '700',
     color: colors.white,
     textAlign: 'center',
+  },
+  startButtonTextDisabled: {
+    color: colors.text.tertiary,
   },
   bottomNav: {
     position: 'absolute',

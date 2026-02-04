@@ -13,6 +13,9 @@ import TasksIcon from './icons/TasksIcon';
 import ProfileIcon from './icons/ProfileIcon';
 import SignalIcon from './icons/SignalIcon';
 import { useBatteryLevel } from '../hooks/useBatteryLevel';
+import { statisticsService } from '../services/statistics.service';
+import { useAuth } from '../contexts/AuthContext';
+import { authService, UserProfileResponse } from '../services/auth.service';
 import {
   colors,
   typography,
@@ -29,7 +32,10 @@ interface HomeScreenProps {
 
 export default function HomeScreen({ onNavigate, onOrderReceived }: HomeScreenProps) {
   const [currentTime, setCurrentTime] = useState('');
+  const [todayCompletedCount, setTodayCompletedCount] = useState(0);
+  const [profileData, setProfileData] = useState<UserProfileResponse | null>(null);
   const batteryLevel = useBatteryLevel();
+  const { isAuthenticated, user } = useAuth();
 
   useEffect(() => {
     // Auto-navigate to order received screen after 5 seconds
@@ -59,6 +65,54 @@ export default function HomeScreen({ onNavigate, onOrderReceived }: HomeScreenPr
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch user profile data
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!isAuthenticated || !user) {
+        setProfileData(null);
+        return;
+      }
+
+      try {
+        const profile = await authService.getProfile();
+        setProfileData(profile);
+      } catch (error) {
+        console.error('[HomeScreen] Error fetching profile:', error);
+        setProfileData(null);
+      }
+    };
+
+    fetchProfile();
+  }, [isAuthenticated, user]);
+
+  // Fetch today's completed orders count
+  useEffect(() => {
+    const fetchTodayCompletedCount = async () => {
+      if (!isAuthenticated) {
+        setTodayCompletedCount(0);
+        return;
+      }
+
+      try {
+        const count = await statisticsService.getTodayCompletedOrdersCount();
+        setTodayCompletedCount(count);
+      } catch (error) {
+        console.error('[HomeScreen] Error fetching today completed count:', error);
+        setTodayCompletedCount(0);
+      }
+    };
+
+    fetchTodayCompletedCount();
+
+    // Refresh every 30 seconds
+    const refreshInterval = setInterval(fetchTodayCompletedCount, 30000);
+
+    return () => clearInterval(refreshInterval);
+  }, [isAuthenticated]);
+
+  // Get display name from profile data or user context
+  const displayName = profileData?.name || user?.name || 'User';
+
   return (
     <View style={styles.container}>
       {/* Header with Time */}
@@ -76,11 +130,11 @@ export default function HomeScreen({ onNavigate, onOrderReceived }: HomeScreenPr
         {/* Dashboard Card */}
         <Card style={styles.dashboardCard} padding="l" gap="sm">
           <View style={styles.dashboardHeader}>
-            <Text style={styles.userName}>👤 Rahul Kumar</Text>
+            <Text style={styles.userName}>👤 {displayName}</Text>
             <Text style={styles.targetText}>🎯 Target: 50 orders</Text>
           </View>
           <View style={styles.statsContainer}>
-            <Text style={styles.statText}>📊 TODAY: 0 complete</Text>
+            <Text style={styles.statText}>📊 TODAY: {todayCompletedCount} complete</Text>
             <Text style={styles.statSeparator}>|</Text>
             <Text style={styles.statText}>100%</Text>
             <Text style={styles.statSeparator}>|</Text>

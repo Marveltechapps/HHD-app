@@ -57,11 +57,12 @@ export default function OrderCompleteScreen({
       setLiveCounter((prev) => (prev + 1) % 10);
     }, 1000);
 
+
     return () => {
       clearInterval(interval);
       clearInterval(liveInterval);
     };
-  }, []);
+  }, [orderId]);
 
   const savedTime = targetTime - pickTime;
   const beatTarget = pickTime < targetTime;
@@ -84,7 +85,7 @@ export default function OrderCompleteScreen({
         <View style={styles.successCard}>
           <Text style={styles.successTitle}>🎉 ORDER COMPLETE!</Text>
           <Text style={styles.successSubtitle}>
-            📦 {rackLocation} BAG placed ✓
+            📦 Order {orderId} | {rackLocation} BAG placed ✓
           </Text>
           
           {/* Time Info */}
@@ -93,12 +94,14 @@ export default function OrderCompleteScreen({
               <CheckIcon width={14} height={14} color={colors.text.primary} />
               <Text style={styles.timeInfoText}>⏱️ {pickTime}s</Text>
             </View>
-            <View style={styles.timeInfoItem}>
-              <CheckIcon width={14} height={14} color={colors.success} />
-              <Text style={styles.beatTargetText}>
-                🎯 Beat target {targetTime}s!
-              </Text>
-            </View>
+            {beatTarget && (
+              <View style={styles.timeInfoItem}>
+                <CheckIcon width={14} height={14} color={colors.success} />
+                <Text style={styles.beatTargetText}>
+                  🎯 Beat target {targetTime}s!
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 

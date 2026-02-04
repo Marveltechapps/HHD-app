@@ -6,6 +6,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Logo from './Logo';
@@ -25,6 +26,8 @@ import {
   isMobileInputAllowed,
   cleanMobileNumber,
 } from '../utils/mobileValidation';
+import { useAuth } from '../contexts/AuthContext';
+import { checkBackendHealth, getConnectionInfo } from '../utils/apiHelper';
 
 interface LoginScreenProps {
   onSendOTP?: (mobileNumber: string) => void;
@@ -32,9 +35,11 @@ interface LoginScreenProps {
 
 export default function LoginScreen({ onSendOTP }: LoginScreenProps) {
   const batteryLevel = useBatteryLevel();
+  const { sendOTP } = useAuth();
   const [mobileNumber, setMobileNumber] = useState('');
   const [error, setError] = useState<string | undefined>();
   const [touched, setTouched] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Validate mobile number
   const validation = validateMobileNumber(mobileNumber, { country: 'IN' });
@@ -71,17 +76,100 @@ export default function LoginScreen({ onSendOTP }: LoginScreenProps) {
     setError(validation.error);
   };
 
-  const handleSendOTP = () => {
+  const handleSendOTP = async () => {
     setTouched(true);
     const validation = validateMobileNumber(mobileNumber, { country: 'IN' });
     
-    if (validation.isValid && onSendOTP) {
-      // Send cleaned mobile number
-      const cleaned = cleanMobileNumber(mobileNumber);
-      onSendOTP(cleaned);
-      setError(undefined);
-    } else {
+    if (!validation.isValid) {
       setError(validation.error);
+      return;
+    }
+
+    setLoading(true);
+    setError(undefined);
+
+    try {
+      const cleaned = cleanMobileNumber(mobileNumber);
+      
+      // Validate mobile number format matches backend requirements (10 digits starting with 6-9)
+      if (!/^[6-9]\d{9}$/.test(cleaned)) {
+        setError('Mobile number must be 10 digits starting with 6, 7, 8, or 9');
+        Alert.alert('Invalid Mobile Number', 'Mobile number must be 10 digits starting with 6, 7, 8, or 9');
+        setLoading(false);
+        return;
+      }
+
+      const response = await sendOTP(cleaned);
+      
+      console.log('[Login Screen] Send OTP Response:', response);
+      
+      // In development, OTP is returned in response
+      if (__DEV__ && response.otp) {
+        console.log('✅ OTP generated (dev only):', response.otp);
+        Alert.alert(
+          'OTP Sent (Development Mode)',
+          `Your OTP is: ${response.otp}\n\nThis is only shown in development mode.\nYou can enter this OTP to verify.`,
+          [{ text: 'OK' }]
+        );
+      } else if (__DEV__) {
+        // If in dev mode but OTP not in response, log warning
+        console.warn('[Login Screen] Development mode but OTP not in response');
+      }
+
+      // Call parent callback if provided
+      if (onSendOTP) {
+        onSendOTP(cleaned);
+      }
+    } catch (error: any) {
+      console.error('[Login Screen] Send OTP Error:', error);
+      console.error('[Login Screen] Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+      });
+      
+      let errorMessage = error.message || 'Failed to send OTP. Please try again.';
+      let showDetailedHelp = false;
+      
+      // Provide more specific error messages
+      if (error.message?.includes('Cannot connect to server') || 
+          error.message?.includes('Failed to fetch') || 
+          error.message?.includes('Network request failed')) {
+        errorMessage = 'Cannot connect to backend server.';
+        showDetailedHelp = true;
+      } else if (error.status === 400) {
+        errorMessage = error.message || 'Invalid mobile number format';
+      }
+      
+      setError(errorMessage);
+      
+      if (showDetailedHelp) {
+        const connectionInfo = getConnectionInfo();
+        
+        Alert.alert(
+          'Backend Server Not Running',
+          `Cannot connect to backend server.\n\nQuick Fix:\n\n1. Open terminal\n2. Run: cd HHD-APP-Backend\n3. Run: npm run dev\n4. Wait for "🚀 Server running on port 5000"\n5. Try again\n\nOr double-click: start-backend.bat`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {},
+            },
+            {
+              text: 'More Info',
+              onPress: () => {
+                Alert.alert(
+                  'Connection Details',
+                  `Platform: ${connectionInfo.platform}\nExpected URL: ${connectionInfo.baseUrl.replace('/api', '')}\n\n${connectionInfo.instructions}\n\nSee START_BACKEND.md for help.`
+                );
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Error', errorMessage);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -129,9 +217,9 @@ export default function LoginScreen({ onSendOTP }: LoginScreenProps) {
             />
 
             <PrimaryButton
-              title="SEND OTP →"
+              title={loading ? "SENDING..." : "SEND OTP →"}
               onPress={handleSendOTP}
-              disabled={!isValid}
+              disabled={!isValid || loading}
             />
           </View>
         </ScrollView>
