@@ -17,7 +17,7 @@ import ScanRackQRScreen from './src/components/ScanRackQRScreen';
 import OrderCompleteScreen from './src/components/OrderCompleteScreen';
 import TasksScreen from './src/components/TasksScreen';
 import ProfileScreen from './src/components/ProfileScreen';
-import { Order } from './src/services/order.service';
+import { Order, orderService } from './src/services/order.service';
 
 type Screen = 'splash' | 'deviceReady' | 'terms' | 'login' | 'otp' | 'home' | 'orderReceived' | 'bagScan' | 'orderOverview' | 'activePickSession' | 'orderCompletion' | 'photoInsideBag' | 'scanRackQR' | 'orderComplete' | 'tasks' | 'profile';
 
@@ -80,12 +80,14 @@ function AppContent() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [pickStartTime, setPickStartTime] = useState<Date | null>(null);
   const [rackLocation, setRackLocation] = useState<string | null>(null);
+  const [completedOrderData, setCompletedOrderData] = useState<Order | null>(null);
 
   const handleOrderReceived = () => {
     setCurrentScreen('orderReceived');
     setSelectedOrder(null); // Reset when going back to order received screen
     setPickStartTime(null);
     setRackLocation(null);
+    setCompletedOrderData(null); // Reset completed order data
   };
 
   const handleStartPicking = (order?: Order) => {
@@ -107,9 +109,25 @@ function AppContent() {
     setCurrentScreen('bagScan');
   };
 
-  const handleStartPickingFromOverview = () => {
+  const handleStartPickingFromOverview = async () => {
     // Track when picking starts
-    setPickStartTime(new Date());
+    const startTime = new Date();
+    setPickStartTime(startTime);
+    
+    // Update order status to "picking" and set startedAt on backend
+    if (selectedOrder?.orderId) {
+      try {
+        await orderService.updateOrderStatus(selectedOrder.orderId, {
+          status: 'picking',
+        });
+        // Note: startedAt should be set by backend when status changes to "picking"
+        // If backend doesn't support this, we may need to add it explicitly
+      } catch (error) {
+        console.error('[App] Failed to update order status to picking:', error);
+        // Continue anyway - the local tracking will still work
+      }
+    }
+    
     setCurrentScreen('activePickSession');
   };
 
@@ -126,8 +144,12 @@ function AppContent() {
     setCurrentScreen('orderCompletion');
   };
 
-  const handleCompletionBack = () => {
+  const handleCompletionNext = () => {
     setCurrentScreen('photoInsideBag');
+  };
+
+  const handleCompletionBack = () => {
+    setCurrentScreen('activePickSession');
   };
 
   const handlePhotoComplete = () => {
@@ -138,15 +160,40 @@ function AppContent() {
     setCurrentScreen('orderCompletion');
   };
 
-  const handleRackScanComplete = (scannedRackLocation?: string) => {
+  const handleRackScanComplete = async (scannedRackLocation?: string) => {
     // Store the rack location
     if (scannedRackLocation) {
       setRackLocation(scannedRackLocation);
     }
+    
+    // Fetch the completed order data to get actual pickTime and targetTime
+    // Note: After rack scan, the order may have been moved to CompletedOrders table,
+    // so a 404 is expected and we'll use the existing order data as fallback
+    if (selectedOrder?.orderId) {
+      try {
+        const response = await orderService.getOrder(selectedOrder.orderId);
+        if (response.order) {
+          setCompletedOrderData(response.order);
+        }
+      } catch (error: any) {
+        // 404 is expected when order is moved to CompletedOrders after rack scan
+        // Silently handle it and use existing order data as fallback
+        if (error.status !== 404) {
+          console.error('[App] Failed to fetch completed order:', error);
+        }
+        // Continue anyway - will use fallback values from selectedOrder
+      }
+    }
+    
     setCurrentScreen('orderComplete');
   };
 
   const handleReadyNext = () => {
+    // Reset order-related state when going back to home
+    setSelectedOrder(null);
+    setPickStartTime(null);
+    setRackLocation(null);
+    setCompletedOrderData(null);
     setCurrentScreen('home');
   };
 
@@ -277,7 +324,7 @@ function AppContent() {
             zone={selectedOrder?.zone || "Zone B"}
             completedItems={completedItems}
             onBack={handleCompletionBack}
-            onComplete={handlePhotoComplete}
+            onComplete={handleCompletionNext}
           />
         );
       case 'photoInsideBag':
@@ -297,27 +344,47 @@ function AppContent() {
             bagId="BAG-001"
             rackLocation="Rack D1-Slot 3"
             riderName="Rider Rohan"
+            pickStartTime={pickStartTime}
             onBack={handleBackFromRackScan}
             onScanComplete={handleRackScanComplete}
           />
         );
       case 'orderComplete':
-        // Calculate pick time in seconds
-        const calculatedPickTime = pickStartTime
-          ? Math.round((new Date().getTime() - pickStartTime.getTime()) / 1000)
-          : 52; // Fallback to default if no start time tracked
+        // Use completed order data if available, otherwise fall back to selected order
+        const orderData = completedOrderData || selectedOrder;
         
-        // Get target time from selected order (convert from minutes to seconds if needed)
-        // Based on the model, targetTime is in minutes, but the UI shows seconds
-        const targetTimeInSeconds = selectedOrder?.targetTime
-          ? selectedOrder.targetTime * 60
-          : 55; // Fallback to default
+        // Calculate pick time in seconds
+        // Priority: 1) pickTime from completed order (in minutes), 2) calculate from pickStartTime, 3) fallback
+        let calculatedPickTimeInSeconds: number;
+        if (orderData?.pickTime !== undefined && orderData.pickTime !== null) {
+          // Backend stores pickTime in minutes, convert to seconds
+          calculatedPickTimeInSeconds = Math.round(orderData.pickTime * 60);
+        } else if (pickStartTime) {
+          // Calculate from pickStartTime if available
+          calculatedPickTimeInSeconds = Math.round((new Date().getTime() - pickStartTime.getTime()) / 1000);
+        } else {
+          // Fallback: try to calculate from startedAt if available
+          if (orderData?.startedAt) {
+            const startTime = new Date(orderData.startedAt).getTime();
+            const completedTime = orderData.completedAt ? new Date(orderData.completedAt).getTime() : new Date().getTime();
+            calculatedPickTimeInSeconds = Math.round((completedTime - startTime) / 1000);
+          } else {
+            // Last resort fallback
+            calculatedPickTimeInSeconds = 75;
+          }
+        }
+        
+        // Get target time from order (convert from minutes to seconds)
+        // Backend stores targetTime in minutes, UI displays in seconds
+        const targetTimeInSeconds = orderData?.targetTime
+          ? Math.round(orderData.targetTime * 60)
+          : 1680; // Fallback to default (28 minutes = 1680 seconds)
         
         return (
           <OrderCompleteScreen
-            orderId={selectedOrder?.orderId || "ORD-45621"}
+            orderId={orderData?.orderId || "ORD-45621"}
             rackLocation={rackLocation || "RACK-D1-SLOT3"}
-            pickTime={calculatedPickTime}
+            pickTime={calculatedPickTimeInSeconds}
             targetTime={targetTimeInSeconds}
             onReadyNext={handleReadyNext}
           />

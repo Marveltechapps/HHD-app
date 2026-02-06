@@ -359,12 +359,12 @@ export default function OrderOverviewScreen({
             </View>
           ) : (
             <View style={styles.orderDetailsContent}>
-              {orderDetails?.riderName && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Rider:</Text>
-                  <Text style={styles.detailValue}>{orderDetails.riderName}</Text>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Priority:</Text>
+                <View style={styles.priorityBadge}>
+                  <Text style={styles.priorityText}>HIGH</Text>
                 </View>
-              )}
+              </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Delivery Zone:</Text>
                 <Text style={[styles.detailValue, { color: colors.success }]}>
@@ -375,6 +375,18 @@ export default function OrderOverviewScreen({
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Target Time:</Text>
                   <Text style={styles.detailValue}>{formatTargetTime()}</Text>
+                </View>
+              )}
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Customer:</Text>
+                <Text style={styles.detailValue}>
+                  {orderDetails?.userId ? `#C-${orderDetails.userId.slice(-5)}` : '#C-89234'}
+                </Text>
+              </View>
+              {orderDetails?.riderName && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Rider:</Text>
+                  <Text style={styles.detailValue}>{orderDetails.riderName}</Text>
                 </View>
               )}
               {orderDetails?.rackLocation && (

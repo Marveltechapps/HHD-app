@@ -50,13 +50,17 @@ class AuthService {
    */
   async sendOTP(mobile: string): Promise<SendOTPResponse> {
     try {
+      console.log('[Auth Service] Sending OTP request for mobile:', mobile);
+      const startTime = Date.now();
+      
       const response = await apiService.post<SendOTPResponse>(
         API_ENDPOINTS.AUTH.SEND_OTP,
         { mobile },
         false // No auth required
       );
 
-      console.log('[Auth Service] Send OTP Response:', response);
+      const duration = Date.now() - startTime;
+      console.log('[Auth Service] Send OTP Response received in', duration, 'ms:', response);
 
       if (!response.success) {
         throw new Error(response.message || 'Failed to send OTP');
@@ -82,6 +86,16 @@ class AuthService {
       return result;
     } catch (error: any) {
       console.error('[Auth Service] Send OTP Error:', error);
+      
+      // Provide more helpful error messages
+      if (error.status === 0) {
+        if (error.message?.includes('timeout')) {
+          throw new Error('Request timed out. The server may be slow or unreachable. Please check your network connection and ensure the backend server is running.');
+        } else if (error.message?.includes('Cannot connect')) {
+          throw new Error('Cannot connect to the backend server. Please ensure:\n1. Backend is running\n2. Correct IP address is configured\n3. Both devices are on the same network');
+        }
+      }
+      
       throw error;
     }
   }

@@ -148,16 +148,39 @@ class OrderService {
    * Update assignorder status (from assignorders collection)
    */
   async updateAssignOrderStatus(orderId: string, status: string): Promise<Order> {
-    const response = await apiService.put<Order>(
-      API_ENDPOINTS.ORDERS.UPDATE_ASSIGNORDER_STATUS(orderId),
-      { status }
-    );
+    try {
+      const response = await apiService.put<Order>(
+        API_ENDPOINTS.ORDERS.UPDATE_ASSIGNORDER_STATUS(orderId),
+        { status }
+      );
+
+      if (!response.success || !response.data) {
+        const error: any = new Error(response.message || 'Failed to update assignorder status');
+        error.status = response.error ? 404 : undefined; // Preserve 404 status if order not found
+        throw error;
+      }
+
+      return response.data;
+    } catch (error: any) {
+      // Preserve status code and message from API error
+      const apiError: any = new Error(error.message || 'Failed to update assignorder status');
+      apiError.status = error.status;
+      apiError.originalError = error.originalError || error;
+      throw apiError;
+    }
+  }
+
+  /**
+   * Get completed orders from Completed Orders table
+   */
+  async getCompletedOrders(): Promise<Order[]> {
+    const response = await apiService.get<Order[]>(API_ENDPOINTS.ORDERS.COMPLETED);
 
     if (!response.success || !response.data) {
-      throw new Error(response.message || 'Failed to update assignorder status');
+      throw new Error(response.message || 'Failed to get completed orders');
     }
 
-    return response.data;
+    return Array.isArray(response.data) ? response.data : [];
   }
 }
 

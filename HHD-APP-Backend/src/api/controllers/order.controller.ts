@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { ErrorResponse } from '../../utils/ErrorResponse';
 import Order from '../../models/Order.model';
+import CompletedOrder from '../../models/CompletedOrder.model';
 import Item from '../../models/Item.model';
 import { AuthRequest } from '../../middleware/auth';
 import { ORDER_STATUS } from '../../utils/constants';
@@ -165,6 +166,11 @@ export const updateOrderStatus = async (
     if (riderId) order.riderId = riderId;
     if (pickTime) order.pickTime = pickTime;
 
+    // Set startedAt when status changes to "picking"
+    if (status === ORDER_STATUS.PICKING && !order.startedAt) {
+      order.startedAt = new Date();
+    }
+
     if (status === ORDER_STATUS.COMPLETED) {
       order.completedAt = new Date();
     }
@@ -201,6 +207,11 @@ export const getOrdersByStatus = async (
     const { status } = req.params;
     const userId = req.user?.id;
 
+    if (!userId) {
+      return next(new ErrorResponse('User ID is required', 401));
+    }
+
+    // Fetch orders from Orders table (Tata Base) filtered by userId and status
     const orders = await Order.find({ userId, status }).sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -227,13 +238,22 @@ export const getAssignOrdersByStatus = async (
     const { status } = req.params;
     const userId = req.user?.id;
 
+    if (!userId) {
+      return next(new ErrorResponse('User ID is required', 401));
+    }
+
     // Get the assignorders collection directly
     const assignOrdersCollection = mongoose.connection.collection('assignorders');
 
-    // Query all assignorders with the specified status
-    // Assignorders are available for any picker, so we don't filter by userId
+    // Query assignorders with the specified status, filtered by userId
+    // Only show orders assigned to the current user
+    const query: any = { 
+      status: status,
+      userId: new mongoose.Types.ObjectId(userId)
+    };
+    
     const orders = await assignOrdersCollection
-      .find({ status: status })
+      .find(query)
       .sort({ createdAt: -1 })
       .toArray();
 
@@ -322,6 +342,39 @@ export const updateAssignOrderStatus = async (
     });
   } catch (error) {
     console.error('[AssignOrders] Error updating assignorder status:', error);
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get completed orders from Completed Orders table
+ * @route   GET /api/orders/completed
+ * @access  Private
+ */
+export const getCompletedOrders = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return next(new ErrorResponse('User ID is required', 401));
+    }
+
+    // Fetch completed orders from Completed Orders table filtered by userId
+    const completedOrders = await CompletedOrder.find({ userId })
+      .sort({ completedAt: -1 })
+      .exec();
+
+    res.status(200).json({
+      success: true,
+      count: completedOrders.length,
+      data: completedOrders,
+    });
+  } catch (error) {
+    console.error('[Orders] Error fetching completed orders:', error);
     next(error);
   }
 };

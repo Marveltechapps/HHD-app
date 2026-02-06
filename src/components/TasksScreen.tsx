@@ -73,6 +73,7 @@ export default function TasksScreen({ onNavigate }: TasksScreenProps) {
             activeTime: '0m',
             efficiencyRate: 0,
           },
+          completedOrdersList: [],
         });
       } finally {
         setIsLoading(false);
@@ -81,8 +82,8 @@ export default function TasksScreen({ onNavigate }: TasksScreenProps) {
 
     fetchStatistics();
 
-    // Refresh statistics every 30 seconds
-    const refreshInterval = setInterval(fetchStatistics, 30000);
+    // Refresh statistics every 10 seconds for real-time updates
+    const refreshInterval = setInterval(fetchStatistics, 10000);
 
     return () => clearInterval(refreshInterval);
   }, []);
@@ -206,6 +207,7 @@ export default function TasksScreen({ onNavigate }: TasksScreenProps) {
             </View>
           </View>
         )}
+
       </ScrollView>
 
       {/* Bottom Navigation */}
@@ -441,6 +443,81 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...typography.b1,
+    color: colors.text.secondary,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  ordersCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.borderLight,
+    borderRadius: radius.medium,
+    padding: spacing.l + spacing.xs, // 23px
+    paddingBottom: spacing.xs,
+    gap: spacing.m,
+    marginBottom: spacing.l + spacing.xs, // 21px
+    ...shadows.card,
+  },
+  ordersList: {
+    gap: 0,
+  },
+  orderItem: {
+    paddingBottom: spacing.m,
+    marginBottom: spacing.m,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  orderItemLast: {
+    borderBottomWidth: 0,
+    marginBottom: 0,
+    paddingBottom: 0,
+  },
+  orderItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  orderId: {
+    ...typography.b1,
+    fontWeight: '700',
+    color: colors.text.primary,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  orderDate: {
+    ...typography.b2,
+    fontWeight: '400',
+    color: colors.text.secondary,
+    fontSize: 12,
+    lineHeight: 17.5,
+  },
+  orderItemDetails: {
+    flexDirection: 'row',
+    gap: spacing.m,
+    flexWrap: 'wrap',
+  },
+  orderDetailText: {
+    ...typography.b2,
+    fontWeight: '400',
+    color: colors.text.secondary,
+    fontSize: 12,
+    lineHeight: 17.5,
+  },
+  noOrdersCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.borderLight,
+    borderRadius: radius.medium,
+    padding: spacing.l + spacing.xs, // 23px
+    marginBottom: spacing.l,
+    alignItems: 'center',
+    ...shadows.card,
+  },
+  noOrdersText: {
+    ...typography.b1,
+    fontWeight: '400',
     color: colors.text.secondary,
     fontSize: 14,
     lineHeight: 21,

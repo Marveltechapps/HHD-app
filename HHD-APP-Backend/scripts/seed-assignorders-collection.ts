@@ -58,9 +58,8 @@ const buildSeedItems = (orderId: string, itemCount: number): SeedItem[] => {
  * Alternative seed script that inserts directly into 'assignorders' collection
  * Use this if you have a separate 'assignorders' collection in MongoDB
  * 
- * This script inserts 5 assigned orders:
- * - 3 orders with status 'pending'
- * - 2 orders with other statuses
+ * This script inserts 10 assigned orders:
+ * - All 10 orders with status 'pending' for development purposes
  */
 const seedAssignOrdersCollection = async (): Promise<void> => {
   try {
@@ -86,26 +85,31 @@ const seedAssignOrdersCollection = async (): Promise<void> => {
     // Get the assignorders collection directly
     const assignOrdersCollection = mongoose.connection.collection('assignorders');
 
+    // Generate order IDs from 001 to 010
+    const orderIds = Array.from({ length: 10 }, (_, i) => 
+      `ORDER-ASSIGN-${String(i + 1).padStart(3, '0')}`
+    );
+
     // Check if orders already exist
     const existingOrders = await assignOrdersCollection.find({
-      orderId: { $in: ['ORDER-ASSIGN-001', 'ORDER-ASSIGN-002', 'ORDER-ASSIGN-003', 'ORDER-ASSIGN-004', 'ORDER-ASSIGN-005'] }
+      orderId: { $in: orderIds }
     }).toArray();
 
     if (existingOrders.length > 0) {
       console.log('⚠️  Some assigned orders already exist. Deleting them first...');
       await assignOrdersCollection.deleteMany({
-        orderId: { $in: ['ORDER-ASSIGN-001', 'ORDER-ASSIGN-002', 'ORDER-ASSIGN-003', 'ORDER-ASSIGN-004', 'ORDER-ASSIGN-005'] }
+        orderId: { $in: orderIds }
       });
       console.log('✅ Existing orders deleted');
     }
 
-    // Create 5 assigned orders
+    // Create 10 assigned orders - all with pending status
     const assignedOrders = [
       {
         orderId: 'ORDER-ASSIGN-001',
         userId: user._id,
         zone: ZONE.A,
-        status: ORDER_STATUS.PENDING, // Pending status
+        status: ORDER_STATUS.PENDING,
         itemCount: 5,
         items: buildSeedItems('ORDER-ASSIGN-001', 5),
         riderName: 'John Doe',
@@ -121,7 +125,7 @@ const seedAssignOrdersCollection = async (): Promise<void> => {
         orderId: 'ORDER-ASSIGN-002',
         userId: user._id,
         zone: ZONE.B,
-        status: ORDER_STATUS.PENDING, // Pending status
+        status: ORDER_STATUS.PENDING,
         itemCount: 8,
         items: buildSeedItems('ORDER-ASSIGN-002', 8),
         riderName: 'Jane Smith',
@@ -137,7 +141,7 @@ const seedAssignOrdersCollection = async (): Promise<void> => {
         orderId: 'ORDER-ASSIGN-003',
         userId: user._id,
         zone: ZONE.C,
-        status: ORDER_STATUS.PENDING, // Pending status
+        status: ORDER_STATUS.PENDING,
         itemCount: 12,
         items: buildSeedItems('ORDER-ASSIGN-003', 12),
         riderName: 'Mike Johnson',
@@ -153,7 +157,7 @@ const seedAssignOrdersCollection = async (): Promise<void> => {
         orderId: 'ORDER-ASSIGN-004',
         userId: user._id,
         zone: ZONE.D,
-        status: ORDER_STATUS.PICKING, // Non-pending status
+        status: ORDER_STATUS.PENDING,
         itemCount: 6,
         items: buildSeedItems('ORDER-ASSIGN-004', 6),
         riderName: 'Sarah Williams',
@@ -161,7 +165,6 @@ const seedAssignOrdersCollection = async (): Promise<void> => {
         rackLocation: 'RACK-D4',
         bagId: 'BAG-004',
         targetTime: 20,
-        pickTime: 15,
         startedAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -170,7 +173,7 @@ const seedAssignOrdersCollection = async (): Promise<void> => {
         orderId: 'ORDER-ASSIGN-005',
         userId: user._id,
         zone: ZONE.A,
-        status: ORDER_STATUS.RACK_ASSIGNED, // Non-pending status
+        status: ORDER_STATUS.PENDING,
         itemCount: 10,
         items: buildSeedItems('ORDER-ASSIGN-005', 10),
         riderName: 'David Brown',
@@ -182,13 +185,93 @@ const seedAssignOrdersCollection = async (): Promise<void> => {
         createdAt: new Date(),
         updatedAt: new Date(),
       },
+      {
+        orderId: 'ORDER-ASSIGN-006',
+        userId: user._id,
+        zone: ZONE.B,
+        status: ORDER_STATUS.PENDING,
+        itemCount: 7,
+        items: buildSeedItems('ORDER-ASSIGN-006', 7),
+        riderName: 'Emily Davis',
+        riderId: 'RIDER-006',
+        rackLocation: 'RACK-B6',
+        bagId: 'BAG-006',
+        targetTime: 28,
+        startedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        orderId: 'ORDER-ASSIGN-007',
+        userId: user._id,
+        zone: ZONE.C,
+        status: ORDER_STATUS.PENDING,
+        itemCount: 15,
+        items: buildSeedItems('ORDER-ASSIGN-007', 15),
+        riderName: 'Chris Wilson',
+        riderId: 'RIDER-007',
+        rackLocation: 'RACK-C7',
+        bagId: 'BAG-007',
+        targetTime: 45,
+        startedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        orderId: 'ORDER-ASSIGN-008',
+        userId: user._id,
+        zone: ZONE.D,
+        status: ORDER_STATUS.PENDING,
+        itemCount: 9,
+        items: buildSeedItems('ORDER-ASSIGN-008', 9),
+        riderName: 'Alex Martinez',
+        riderId: 'RIDER-008',
+        rackLocation: 'RACK-D8',
+        bagId: 'BAG-008',
+        targetTime: 32,
+        startedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        orderId: 'ORDER-ASSIGN-009',
+        userId: user._id,
+        zone: ZONE.A,
+        status: ORDER_STATUS.PENDING,
+        itemCount: 11,
+        items: buildSeedItems('ORDER-ASSIGN-009', 11),
+        riderName: 'Taylor Anderson',
+        riderId: 'RIDER-009',
+        rackLocation: 'RACK-A9',
+        bagId: 'BAG-009',
+        targetTime: 38,
+        startedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        orderId: 'ORDER-ASSIGN-010',
+        userId: user._id,
+        zone: ZONE.B,
+        status: ORDER_STATUS.PENDING,
+        itemCount: 13,
+        items: buildSeedItems('ORDER-ASSIGN-010', 13),
+        riderName: 'Jordan Lee',
+        riderId: 'RIDER-010',
+        rackLocation: 'RACK-B10',
+        bagId: 'BAG-010',
+        targetTime: 42,
+        startedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
     ];
 
-    console.log('📦 Inserting 5 assigned orders into assignorders collection...');
+    console.log('📦 Inserting 10 assigned orders into assignorders collection...');
     const result = await assignOrdersCollection.insertMany(assignedOrders);
 
     // Also seed the Item collection so order details screens can fetch items by orderId
-    const orderIds = assignedOrders.map((o) => o.orderId);
+    // Reuse the orderIds variable from above (they should match)
     console.log('🧹 Clearing existing items for these orders...');
     await Item.deleteMany({ orderId: { $in: orderIds } });
 
@@ -215,7 +298,6 @@ const seedAssignOrdersCollection = async (): Promise<void> => {
     console.log('\n📊 Summary:');
     console.log(`   Total assigned orders: ${assignedOrders.length}`);
     console.log(`   Orders with 'pending' status: ${assignedOrders.filter(o => o.status === ORDER_STATUS.PENDING).length}`);
-    console.log(`   Orders with other statuses: ${assignedOrders.filter(o => o.status !== ORDER_STATUS.PENDING).length}`);
 
     console.log('\n✅ Seed completed successfully!');
   } catch (error) {

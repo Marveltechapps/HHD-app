@@ -20,6 +20,7 @@ export interface ScanRackRequest {
   qrCode: string;
   orderId: string;
   riderId?: string;
+  pickTime?: number; // in minutes
 }
 
 class RackService {

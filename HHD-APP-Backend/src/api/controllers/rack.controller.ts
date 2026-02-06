@@ -1,7 +1,10 @@
 import { Response, NextFunction } from 'express';
 import { ErrorResponse } from '../../utils/ErrorResponse';
 import Rack from '../../models/Rack.model';
+import Order from '../../models/Order.model';
+import CompletedOrder from '../../models/CompletedOrder.model';
 import { AuthRequest } from '../../middleware/auth';
+import { ORDER_STATUS } from '../../utils/constants';
 
 /**
  * Parse rack QR code format: Rack-D1-Slot3 (John Doe)
@@ -28,7 +31,8 @@ function parseRackQR(qrCode: string): {
   // identifier: letters and numbers (e.g., D1, A1, B2)
   // number: one or more digits (e.g., 3, 10, 25)
   // rider name: any characters except closing parenthesis
-  const fullPattern = /^Rack-([A-Z0-9]+)-Slot(\d+)\s+\(([^)]+)\)$/i;
+  // Note: \s* allows zero or more spaces before the opening parenthesis for flexibility
+  const fullPattern = /^Rack-([A-Z0-9]+)-Slot(\d+)\s*\(([^)]+)\)$/i;
   const match = trimmed.match(fullPattern);
   
   if (!match) {
@@ -74,7 +78,7 @@ export const scanRack = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { qrCode, orderId, riderId } = req.body;
+    const { qrCode, orderId, riderId, pickTime } = req.body;
 
     if (!qrCode || !orderId) {
       throw new ErrorResponse('Please provide qrCode and orderId', 400);
@@ -116,10 +120,77 @@ export const scanRack = async (
     rack.assignedAt = new Date();
     await rack.save();
 
+    // Find the order in Orders table
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new ErrorResponse('User ID is required', 401);
+    }
+
+    const order = await Order.findOne({ orderId, userId });
+
+    if (order) {
+      // Calculate pickTime if not provided
+      let calculatedPickTime = pickTime;
+      if (!calculatedPickTime && order.startedAt) {
+        // Calculate from startedAt to now (in minutes)
+        const startTime = new Date(order.startedAt).getTime();
+        const completedTime = new Date().getTime();
+        const diffInSeconds = Math.round((completedTime - startTime) / 1000);
+        calculatedPickTime = Math.round(diffInSeconds / 60); // Convert to minutes
+      } else if (!calculatedPickTime && order.pickTime) {
+        // Use existing pickTime from order
+        calculatedPickTime = order.pickTime;
+      }
+
+      // Update order status to completed before moving
+      order.status = ORDER_STATUS.COMPLETED;
+      order.completedAt = new Date();
+      order.rackLocation = parsedRackCode;
+      order.riderName = riderName;
+      if (riderId) order.riderId = riderId;
+      if (calculatedPickTime) order.pickTime = calculatedPickTime;
+      await order.save();
+
+      // Create completed order in Completed Orders table
+      const completedOrderData = {
+        orderId: order.orderId,
+        userId: order.userId,
+        zone: order.zone,
+        status: ORDER_STATUS.COMPLETED,
+        itemCount: order.itemCount,
+        targetTime: order.targetTime,
+        pickTime: calculatedPickTime || order.pickTime,
+        bagId: order.bagId,
+        rackLocation: parsedRackCode, // Use the scanned rack location
+        riderName: riderName,
+        riderId: riderId || order.riderId,
+        startedAt: order.startedAt,
+        completedAt: new Date(),
+        rackAssignedAt: new Date(),
+        createdAt: order.createdAt,
+        updatedAt: new Date(),
+      };
+
+      // Check if completed order already exists (prevent duplicates)
+      const existingCompletedOrder = await CompletedOrder.findOne({ orderId });
+      if (!existingCompletedOrder) {
+        await CompletedOrder.create(completedOrderData);
+        console.log(`[Rack] Order ${orderId} moved to Completed Orders table`);
+      } else {
+        console.log(`[Rack] Order ${orderId} already exists in Completed Orders table, skipping duplicate`);
+      }
+
+      // Delete the order from Orders table (move operation)
+      await Order.deleteOne({ orderId, userId });
+      console.log(`[Rack] Order ${orderId} deleted from Orders table (status changed from Pending to Complete)`);
+    } else {
+      console.warn(`[Rack] Order ${orderId} not found in Orders table, skipping move operation`);
+    }
+
     res.status(200).json({
       success: true,
       data: rack,
-      message: 'Rack scanned and assigned successfully',
+      message: 'Rack scanned and assigned successfully. Order moved to Completed Orders.',
     });
   } catch (error) {
     next(error);

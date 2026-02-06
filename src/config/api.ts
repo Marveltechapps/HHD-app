@@ -97,6 +97,7 @@ export const API_ENDPOINTS = {
     BASE: '/orders',
     BY_ID: (id: string) => `/orders/${id}`,
     BY_STATUS: (status: string) => `/orders/status/${status}`,
+    COMPLETED: '/orders/completed',
     ASSIGNORDERS_BY_STATUS: (status: string) => `/orders/assignorders/status/${status}`,
     UPDATE_STATUS: (id: string) => `/orders/${id}/status`,
     UPDATE_ASSIGNORDER_STATUS: (id: string) => `/orders/assignorders/${id}/status`,

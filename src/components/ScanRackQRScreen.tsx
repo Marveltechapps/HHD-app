@@ -28,6 +28,7 @@ interface ScanRackQRScreenProps {
   bagId?: string;
   rackLocation?: string;
   riderName?: string;
+  pickStartTime?: Date | null;
   onBack?: () => void;
   onScanComplete?: (rackLocation?: string) => void;
 }
@@ -37,6 +38,7 @@ export default function ScanRackQRScreen({
   bagId = 'BAG-001',
   rackLocation = 'Rack D1-Slot 3',
   riderName = 'Rider Rohan',
+  pickStartTime,
   onBack,
   onScanComplete,
 }: ScanRackQRScreenProps) {
@@ -65,12 +67,13 @@ export default function ScanRackQRScreen({
   }, []);
 
   const handleStartScan = () => {
+    setError(undefined); // Clear any previous errors
     setIsScanning(true);
   };
 
   /**
    * Validate QR code format: Rack-{identifier}-Slot{number} ({rider name})
-   * Example: Rack-D1-Slot3 (John Doe)
+   * Example: Rack-D1-Slot3 (John Doe) or Rack-D1-Slot3(John Doe)
    */
   const validateQRFormat = (qrData: string): boolean => {
     if (!qrData || typeof qrData !== 'string') {
@@ -78,8 +81,9 @@ export default function ScanRackQRScreen({
     }
     
     const trimmed = qrData.trim();
-    // Strict format validation: Rack-{identifier}-Slot{number} ({rider name})
-    const fullPattern = /^Rack-([A-Z0-9]+)-Slot(\d+)\s+\(([^)]+)\)$/i;
+    // Flexible format validation: Rack-{identifier}-Slot{number} ({rider name})
+    // Allows zero or more spaces before the opening parenthesis
+    const fullPattern = /^Rack-([A-Z0-9]+)-Slot(\d+)\s*\(([^)]+)\)$/i;
     return fullPattern.test(trimmed);
   };
 
@@ -98,10 +102,18 @@ export default function ScanRackQRScreen({
           );
         }
 
+        // Calculate pickTime in minutes (backend expects minutes)
+        let pickTimeInMinutes: number | undefined;
+        if (pickStartTime) {
+          const pickTimeSeconds = Math.round((new Date().getTime() - pickStartTime.getTime()) / 1000);
+          pickTimeInMinutes = Math.round(pickTimeSeconds / 60); // Convert to minutes
+        }
+
         // Call API to scan rack and insert into database
         const rack = await rackService.scanRack({
           qrCode: data,
           orderId: orderId,
+          pickTime: pickTimeInMinutes,
         });
 
         console.log('✅ Rack scanned and saved to database:', rack);
@@ -122,12 +134,12 @@ export default function ScanRackQRScreen({
           ]
         );
       } catch (error: any) {
-        console.error('❌ Error scanning rack:', error);
         const errorMessage = error.message || 'Failed to scan rack. Please try again.';
         setError(errorMessage);
         setIsSubmitting(false);
+        setIsScanning(false); // Reset scanning state
         
-        // Show error alert
+        // Show error alert with option to retry
         Alert.alert(
           'Scan Failed',
           errorMessage,
@@ -135,7 +147,8 @@ export default function ScanRackQRScreen({
             {
               text: 'OK',
               onPress: () => {
-                // Allow user to scan again
+                // Clear error after alert is dismissed
+                setError(undefined);
               },
             },
           ]
@@ -177,6 +190,13 @@ export default function ScanRackQRScreen({
             {error && (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>❌ {error}</Text>
+                <TouchableOpacity
+                  style={styles.dismissButton}
+                  onPress={() => setError(undefined)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.dismissButtonText}>Dismiss</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -327,6 +347,21 @@ const styles = StyleSheet.create({
     color: colors.error,
     textAlign: 'center',
     fontSize: 12,
+    marginBottom: spacing.xs,
+  },
+  dismissButton: {
+    marginTop: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.s,
+    backgroundColor: colorWithOpacity.error(0.2),
+    borderRadius: radius.small,
+    alignSelf: 'center',
+  },
+  dismissButtonText: {
+    ...typography.c1,
+    fontWeight: '600',
+    color: colors.error,
+    fontSize: 11,
   },
   scannerContainer: {
     marginTop: spacing.xl + spacing.s, // 32px from title section

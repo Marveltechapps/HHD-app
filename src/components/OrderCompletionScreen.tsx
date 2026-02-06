@@ -159,7 +159,12 @@ export default function OrderCompletionScreen({
         await orderService.updateAssignOrderStatus(orderId, 'completed');
         console.log('[OrderCompletionScreen] ✅ Assignorder status updated successfully');
       } catch (error: any) {
-        console.error('[OrderCompletionScreen] ❌ Failed to update assignorder status:', error);
+        // Handle 404 errors gracefully (order not found in assignorders collection)
+        if (error.status === 404) {
+          console.warn('[OrderCompletionScreen] ⚠️ AssignOrder not found in database:', orderId, '- This may be expected for test orders or orders not in assignorders collection');
+        } else {
+          console.error('[OrderCompletionScreen] ❌ Failed to update assignorder status:', error);
+        }
         // Don't block the UI flow if this fails
       }
     };

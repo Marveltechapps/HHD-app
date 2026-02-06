@@ -7,6 +7,7 @@ import {
   getOrdersByStatus,
   getAssignOrdersByStatus,
   updateAssignOrderStatus,
+  getCompletedOrders,
 } from '../controllers/order.controller';
 import { protect } from '../../middleware/auth';
 
@@ -16,6 +17,7 @@ router.use(protect);
 
 router.route('/').get(getOrders).post(createOrder);
 router.get('/status/:status', getOrdersByStatus);
+router.get('/completed', getCompletedOrders);
 router.get('/assignorders/status/:status', getAssignOrdersByStatus);
 router.put('/assignorders/:orderId/status', updateAssignOrderStatus);
 router.route('/:orderId').get(getOrder);

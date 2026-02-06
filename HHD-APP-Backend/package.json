@@ -15,6 +15,7 @@
     "test:coverage": "jest --coverage",
     "seed:assigned-orders": "tsx scripts/seed-assigned-orders.ts",
     "seed:assignorders-collection": "tsx scripts/seed-assignorders-collection.ts",
+    "seed:orders-for-all-users": "tsx scripts/seed-orders-for-all-users.ts",
     "prepare": "husky install"
   },
   "keywords": [
@@ -38,7 +39,8 @@
     "mongoose": "^8.0.3",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
-    "socket.io": "^4.6.1"
+    "socket.io": "^4.6.1",
+    "twilio": "^5.12.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

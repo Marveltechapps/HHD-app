@@ -5,6 +5,7 @@
 
 import { orderService, Order } from './order.service';
 import { scannedItemService, ScannedItem } from './scannedItem.service';
+import { authService } from './auth.service';
 
 export interface TaskStatistics {
   ordersCompleted: number;
@@ -16,6 +17,7 @@ export interface TaskStatistics {
     activeTime: string; // Format: "6h 23m"
     efficiencyRate: number; // Percentage
   };
+  completedOrdersList?: Order[]; // List of completed orders
 }
 
 class StatisticsService {
@@ -72,24 +74,34 @@ class StatisticsService {
    * Calculate pick time in seconds from order start and completion times
    */
   private calculatePickTimeInSeconds(order: Order): number | null {
-    if (!order.startedAt || !order.completedAt) {
-      // Fallback to pickTime field if available (in minutes, convert to seconds)
-      if (order.pickTime) {
-        return order.pickTime * 60;
+    // Priority 1: Calculate from startedAt and completedAt if both are available
+    if (order.startedAt && order.completedAt) {
+      try {
+        const startTime = new Date(order.startedAt).getTime();
+        const completedTime = new Date(order.completedAt).getTime();
+        const diffInSeconds = Math.round((completedTime - startTime) / 1000);
+        
+        if (diffInSeconds > 0) {
+          return diffInSeconds;
+        }
+      } catch (error) {
+        console.warn(`[Statistics] Error calculating pick time from dates for order ${order.orderId}:`, error);
       }
-      return null;
     }
 
-    const startTime = new Date(order.startedAt).getTime();
-    const completedTime = new Date(order.completedAt).getTime();
-    const diffInSeconds = Math.round((completedTime - startTime) / 1000);
-    
-    return diffInSeconds > 0 ? diffInSeconds : null;
+    // Priority 2: Use pickTime field if available (in minutes, convert to seconds)
+    if (order.pickTime && order.pickTime > 0) {
+      return Math.round(order.pickTime * 60);
+    }
+
+    // No valid pick time data available
+    return null;
   }
 
   /**
    * Get all completed orders with caching
    * This prevents excessive API calls by caching results for 10 seconds
+   * Fetches from Completed Orders table (Tata Base)
    */
   private async getCompletedOrdersCached(): Promise<Order[]> {
     const now = Date.now();
@@ -100,9 +112,9 @@ class StatisticsService {
       return this.completedOrdersCache;
     }
 
-    // Fetch fresh data
-    console.log('[Statistics] Fetching fresh completed orders from API');
-    const completedOrders = await orderService.getAssignOrdersByStatus('completed');
+    // Fetch fresh data from Completed Orders table
+    console.log('[Statistics] Fetching fresh completed orders from Completed Orders table');
+    const completedOrders = await orderService.getCompletedOrders();
     
     // Update cache
     this.completedOrdersCache = completedOrders;
@@ -150,31 +162,55 @@ class StatisticsService {
    */
   async getTaskStatistics(): Promise<TaskStatistics> {
     try {
+      // Get current user ID to filter data by logged-in user
+      let currentUserId: string | undefined;
+      try {
+        const user = await authService.getMe();
+        currentUserId = user.id;
+      } catch (error) {
+        console.warn('[Statistics] Could not get current user, proceeding without user filter:', error);
+      }
+
       // Use cached method instead of direct call to prevent excessive API calls
+      // Backend already filters completed orders by userId automatically
       const completedOrders = await this.getCompletedOrdersCached();
       
       // Get today's date range
       const { startDate, endDate } = this.getTodayDateRange();
       
-      // Get today's scanned items
+      // Get today's scanned items filtered by current user
       const todayScannedItems = await scannedItemService.getScannedItems({
+        userId: currentUserId,
         startDate,
         endDate,
         limit: 1000, // Get all items for today
       });
 
-      // Calculate Orders Completed
-      const ordersCompleted = completedOrders.length;
+      // Filter today's completed orders
+      const todayCompletedOrders = completedOrders.filter((order) => {
+        if (!order.completedAt) return false;
+        const completedDate = new Date(order.completedAt);
+        return completedDate >= new Date(startDate) && completedDate <= new Date(endDate);
+      });
 
-      // Calculate Average Pick Time
+      // Calculate Orders Completed (only today's orders)
+      const ordersCompleted = todayCompletedOrders.length;
+
+      // Calculate Average Pick Time (only from today's orders)
       let totalPickTimeSeconds = 0;
       let validPickTimes = 0;
       
-      completedOrders.forEach((order) => {
+      todayCompletedOrders.forEach((order) => {
         const pickTimeSeconds = this.calculatePickTimeInSeconds(order);
-        if (pickTimeSeconds !== null) {
+        if (pickTimeSeconds !== null && pickTimeSeconds > 0) {
           totalPickTimeSeconds += pickTimeSeconds;
           validPickTimes++;
+        } else {
+          console.warn(`[Statistics] Order ${order.orderId} has no valid pick time data:`, {
+            startedAt: order.startedAt,
+            completedAt: order.completedAt,
+            pickTime: order.pickTime,
+          });
         }
       });
 
@@ -182,48 +218,16 @@ class StatisticsService {
         ? Math.round(totalPickTimeSeconds / validPickTimes)
         : 0;
       const averagePickTime = this.formatTime(averagePickTimeSeconds);
+      
+      console.log(`[Statistics] Average pick time calculation:`, {
+        ordersCompleted,
+        validPickTimes,
+        averagePickTimeSeconds,
+        averagePickTime,
+      });
 
       // Calculate Accuracy
-      // Accuracy = (Correctly scanned items / Total items in completed orders) * 100
-      let totalItemsInCompletedOrders = 0;
-      let totalScannedItems = 0;
-
-      completedOrders.forEach((order) => {
-        totalItemsInCompletedOrders += order.itemCount || 0;
-      });
-
-      // Count unique scanned items per order
-      const scannedItemsByOrder = new Map<string, Set<string>>();
-      todayScannedItems.data.forEach((item: ScannedItem) => {
-        if (item.orderId) {
-          if (!scannedItemsByOrder.has(item.orderId)) {
-            scannedItemsByOrder.set(item.orderId, new Set());
-          }
-          scannedItemsByOrder.get(item.orderId)!.add(item.barcodeData);
-        }
-      });
-
-      scannedItemsByOrder.forEach((scannedBarcodes, orderId) => {
-        const order = completedOrders.find(o => o.orderId === orderId);
-        if (order) {
-          // Count scanned items (considering quantity from metadata)
-          const orderScannedItems = todayScannedItems.data.filter(
-            (item: ScannedItem) => item.orderId === orderId
-          );
-          const scannedQuantity = orderScannedItems.reduce((sum, item) => {
-            return sum + (item.metadata?.quantity || 1);
-          }, 0);
-          totalScannedItems += Math.min(scannedQuantity, order.itemCount || 0);
-        }
-      });
-
-      // For accuracy, we'll use a simpler calculation: items scanned vs items in completed orders today
-      const todayCompletedOrders = completedOrders.filter((order) => {
-        if (!order.completedAt) return false;
-        const completedDate = new Date(order.completedAt);
-        return completedDate >= new Date(startDate) && completedDate <= new Date(endDate);
-      });
-
+      // Accuracy = (Correctly scanned items / Total items in completed orders today) * 100
       let todayTotalItems = 0;
       let todayScannedCount = 0;
 
@@ -246,11 +250,11 @@ class StatisticsService {
         ? Math.round((todayScannedCount / todayTotalItems) * 100)
         : 100; // Default to 100% if no items
 
-      // Calculate SLA Compliance
-      // SLA Compliance = (Orders completed within target time / Total completed orders) * 100
+      // Calculate SLA Compliance (only from today's orders)
+      // SLA Compliance = (Orders completed within target time / Total completed orders today) * 100
       let slaCompliantOrders = 0;
       
-      completedOrders.forEach((order) => {
+      todayCompletedOrders.forEach((order) => {
         if (!order.targetTime || !order.startedAt || !order.completedAt) {
           // If no target time or timing data, consider it compliant
           slaCompliantOrders++;
@@ -304,7 +308,7 @@ class StatisticsService {
       });
 
       let efficiencyRate = 100; // Default
-      if (ordersWithTargetTime > 0 && totalActiveTimeMinutes > 0) {
+      if (ordersWithTargetTime > 0 && totalActiveTimeMinutes > 0 && todayCompletedOrders.length > 0) {
         const avgTargetTime = totalTargetTimeMinutes / ordersWithTargetTime;
         const avgActualTime = totalActiveTimeMinutes / todayCompletedOrders.length;
         if (avgActualTime > 0) {
@@ -322,6 +326,7 @@ class StatisticsService {
           activeTime: activeTime || '0m',
           efficiencyRate: Math.min(100, Math.max(0, efficiencyRate)),
         },
+        completedOrdersList: todayCompletedOrders, // Include list of completed orders
       };
     } catch (error) {
       console.error('[Statistics] Error calculating statistics:', error);
@@ -336,6 +341,7 @@ class StatisticsService {
           activeTime: '0m',
           efficiencyRate: 0,
         },
+        completedOrdersList: [],
       };
     }
   }

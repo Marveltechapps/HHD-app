@@ -34,16 +34,24 @@ class BagService {
    * Scan bag
    */
   async scanBag(data: ScanBagRequest): Promise<Bag> {
-    const response = await apiService.post<Bag>(API_ENDPOINTS.BAGS.SCAN, data);
+    try {
+      const response = await apiService.post<Bag>(API_ENDPOINTS.BAGS.SCAN, data);
 
-    if (!response.success || !response.data) {
-      // Create error with status preserved from API response
-      const error: any = new Error(response.message || 'Failed to scan bag');
-      // Status will be preserved from ApiError thrown by apiService
-      throw error;
+      if (!response.success || !response.data) {
+        // Create error with status preserved from API response
+        const error: any = new Error(response.message || 'Failed to scan bag');
+        // Status will be preserved from ApiError thrown by apiService
+        throw error;
+      }
+
+      return response.data;
+    } catch (error: any) {
+      // Preserve status code and message from API error
+      const apiError: any = new Error(error.message || 'Failed to scan bag');
+      apiError.status = error.status;
+      apiError.originalError = error.originalError || error;
+      throw apiError;
     }
-
-    return response.data;
   }
 
   /**

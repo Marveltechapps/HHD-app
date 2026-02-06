@@ -84,7 +84,7 @@ export default function OrderReceivedScreen({
     fetchProfile();
   }, [isAuthenticated, user]);
 
-  // Fetch pending orders from assignorders collection
+  // Fetch pending orders from Orders table (Tata Base)
   useEffect(() => {
     const fetchPendingOrders = async () => {
       if (!isAuthenticated) {
@@ -95,13 +95,13 @@ export default function OrderReceivedScreen({
       try {
         setIsLoading(true);
         setError(null);
-        console.log('[OrderReceivedScreen] Fetching pending assignorders...');
-        const response = await orderService.getAssignOrdersByStatus('pending');
+        console.log('[OrderReceivedScreen] Fetching pending orders from Orders table...');
+        const response = await orderService.getOrdersByStatus('pending');
         console.log('[OrderReceivedScreen] Received orders:', response);
         console.log('[OrderReceivedScreen] Number of orders:', response?.length || 0);
         setPendingOrders(response || []);
       } catch (err: any) {
-        console.error('[OrderReceivedScreen] Error fetching pending assignorders:', err);
+        console.error('[OrderReceivedScreen] Error fetching pending orders:', err);
         setError(err.message || 'Failed to load orders');
         setPendingOrders([]);
       } finally {

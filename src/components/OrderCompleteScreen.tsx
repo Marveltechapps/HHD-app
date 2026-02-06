@@ -30,8 +30,8 @@ interface OrderCompleteScreenProps {
 export default function OrderCompleteScreen({
   orderId = 'ORD-45621',
   rackLocation = 'RACK-D1-SLOT3',
-  pickTime = 52,
-  targetTime = 55,
+  pickTime = 75,
+  targetTime = 1680,
   onReadyNext,
 }: OrderCompleteScreenProps) {
   const batteryLevel = useBatteryLevel();
@@ -64,7 +64,9 @@ export default function OrderCompleteScreen({
     };
   }, [orderId]);
 
-  const savedTime = targetTime - pickTime;
+  // Calculate saved time dynamically: targetTime - pickTime (both in seconds)
+  // Only show positive saved time if pickTime is less than targetTime
+  const savedTime = Math.max(0, targetTime - pickTime);
   const beatTarget = pickTime < targetTime;
 
   return (

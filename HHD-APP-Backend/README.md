@@ -94,8 +94,10 @@ MAX_FILE_SIZE=5242880
 UPLOAD_PATH=./uploads
 
 # Rate Limiting
+# Window in milliseconds (default: 15 minutes = 900000ms)
 RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
+# Maximum requests per window (default: 200, increased to avoid 429 errors)
+RATE_LIMIT_MAX_REQUESTS=200
 
 # CORS
 CORS_ORIGIN=http://localhost:3000,http://localhost:19006
