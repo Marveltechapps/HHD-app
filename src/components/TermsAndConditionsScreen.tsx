@@ -66,7 +66,14 @@ export default function TermsAndConditionsScreen({
               <Logo width={35} height={35} />
             </LinearGradient>
           </View>
-          <Text style={styles.title}>📜 Terms & Conditions</Text>
+          <Text
+            style={styles.title}
+            numberOfLines={1}
+            ellipsizeMode="clip"
+            allowFontScaling={false}
+          >
+            Terms & Conditions
+          </Text>
           <Text style={styles.subtitle}>
             Please review and accept to continue
           </Text>
@@ -137,6 +144,10 @@ const styles = StyleSheet.create({
     ...typography.h1,
     color: colors.text.primary,
     marginBottom: spacing.sm, // 12px (closest to 10.5px)
+    // Keep the title on a single line on smaller screens
+    fontSize: 28,
+    lineHeight: 34,
+    textAlign: 'center',
   },
   subtitle: {
     ...typography.b1,

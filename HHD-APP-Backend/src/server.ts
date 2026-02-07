@@ -47,6 +47,15 @@ const startServer = async (): Promise<void> => {
       logger.info(`🌐 Local Access: http://localhost:${PORT}/api`);
       logger.info(`💻 Network Access: http://${LOCAL_IP}:${PORT}/api`);
       logger.info(`📱 Physical Device: Use http://${LOCAL_IP}:${PORT}/api in app.json`);
+      logger.info('');
+      logger.info('🔍 Connection Diagnostics:');
+      logger.info(`   • Server is bound to ${HOST} (all network interfaces)`);
+      logger.info(`   • Your local IP: ${LOCAL_IP}`);
+      logger.info(`   • If connection fails, check:`);
+      logger.info(`     1. Windows Firewall allows port ${PORT}`);
+      logger.info(`     2. Both devices are on the same WiFi network`);
+      logger.info(`     3. app.json has: "apiUrl": "http://${LOCAL_IP}:${PORT}/api"`);
+      logger.info('');
     });
 
     initSocketIO(server);

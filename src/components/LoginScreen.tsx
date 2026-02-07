@@ -197,7 +197,15 @@ export default function LoginScreen({ onSendOTP }: LoginScreenProps) {
                 <Logo width={35} height={35} />
               </LinearGradient>
             </View>
-            <Text style={styles.title}>📱 ENTER MOBILE NUMBER</Text>
+            <Text
+              style={styles.title}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+              allowFontScaling={false}
+            >
+              ENTER MOBILE NUMBER
+            </Text>
             <Text style={styles.subtitle}>
               We'll send you a verification code
             </Text>
@@ -272,6 +280,10 @@ const styles = StyleSheet.create({
     ...typography.h1,
     color: colors.text.primary,
     marginBottom: spacing.sm, // 12px (closest to 10.5px)
+    // Keep this heading on a single line on smaller screens
+    fontSize: 26,
+    lineHeight: 32,
+    textAlign: 'center',
   },
   subtitle: {
     ...typography.b1,

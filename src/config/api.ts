@@ -3,7 +3,7 @@
  * Base URL and API endpoints configuration
  * 
  * To override the API URL, set EXPO_PUBLIC_API_URL environment variable
- * Example: EXPO_PUBLIC_API_URL=http://192.168.1.100:5000/api
+ * Example: EXPO_PUBLIC_API_URL=http://YOUR_IP:5000/api
  */
 
 // For React Native/Expo development, use your machine's IP address
@@ -27,10 +27,33 @@ const getBaseURL = () => {
   // Priority 2: app.json extra config (for physical devices)
   // Configured in app.json → expo.extra.apiUrl
   try {
-    const apiUrl = Constants.expoConfig?.extra?.apiUrl;
-    if (apiUrl) {
-      console.log('[API Config] ✅ Using app.json config (extra.apiUrl):', apiUrl);
-      return apiUrl;
+    // Try multiple ways to access the config
+    const apiUrl = Constants.expoConfig?.extra?.apiUrl || 
+                   Constants.manifest?.extra?.apiUrl ||
+                   Constants.manifest2?.extra?.expoConfig?.extra?.apiUrl;
+    
+    if (apiUrl && typeof apiUrl === 'string') {
+      const trimmedApiUrl = apiUrl.trim();
+      const isPlaceholder =
+        trimmedApiUrl === '' || /YOUR_(IP|LAN_IP|LOCAL_IP)/i.test(trimmedApiUrl);
+
+      if (!isPlaceholder) {
+        console.log('[API Config] ✅ Using app.json config (extra.apiUrl):', trimmedApiUrl);
+        console.log('[API Config] Full Constants:', {
+          expoConfig: Constants.expoConfig?.extra,
+          manifest: Constants.manifest?.extra,
+        });
+        return trimmedApiUrl;
+      }
+
+      console.log('[API Config] ⚠️ app.json apiUrl not found, empty, or placeholder');
+      console.log('[API Config] Full Constants:', {
+        expoConfig: Constants.expoConfig?.extra,
+        manifest: Constants.manifest?.extra,
+      });
+    } else {
+      console.log('[API Config] ⚠️ app.json apiUrl not found');
+      console.log('[API Config] Constants.expoConfig?.extra:', Constants.expoConfig?.extra);
     }
   } catch (e) {
     console.warn('[API Config] Could not read Expo Constants:', e);
@@ -49,19 +72,18 @@ const getBaseURL = () => {
       return url;
     }
     
-    // Android emulator - use 10.0.2.2 to access host machine's localhost
+    // Android - check if we have app.json config, otherwise use emulator URL
     if (platform === 'android') {
-      // Try to detect if running on physical device
-      // For physical devices, we need the actual computer IP address
-      // For emulator, 10.0.2.2 works
-      
-      // Check if we're in an emulator (Expo Go on physical device will have different behavior)
-      // For now, try 10.0.2.2 first (emulator), but provide clear instructions for physical devices
+      // For physical devices, app.json should have been checked above
+      // If we reach here, either app.json is missing or we're in emulator
+      // Default to emulator URL but warn about physical device
       const url = 'http://10.0.2.2:5000/api';
       console.log('[API Config] Android platform detected');
-      console.log('[API Config] Using emulator URL:', url);
-      console.log('[API Config] ⚠️  If on PHYSICAL DEVICE, you need your computer IP (e.g., http://192.168.1.49:5000/api)');
-      console.log('[API Config] Set EXPO_PUBLIC_API_URL=http://YOUR_IP:5000/api in .env or app.json');
+      console.log('[API Config] ⚠️  Using emulator URL:', url);
+      console.log('[API Config] ⚠️  If on PHYSICAL DEVICE and this fails:');
+      console.log('[API Config]   1. Check app.json has: "extra": { "apiUrl": "http://YOUR_IP:5000/api" }');
+      console.log('[API Config]   2. Restart Expo: npm start');
+      console.log('[API Config]   3. Reload app on device');
       return url;
     }
     
