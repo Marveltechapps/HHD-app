@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Alert,
 } from 'react-native';
 import { CameraView, CameraCapturedPicture } from 'expo-camera';
 import Header from './Header';
 import { useBatteryLevel } from '../hooks/useBatteryLevel';
 import CheckIcon from './icons/CheckIcon';
+import { photoService } from '../services/photo.service';
 import {
   colors,
   typography,
@@ -43,6 +45,8 @@ export default function PhotoInsideBagScreen({
   const [detectedItems, setDetectedItems] = useState(detectedCount);
   const [capturedPhoto, setCapturedPhoto] = useState<CameraCapturedPicture | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
 
   useEffect(() => {
@@ -75,6 +79,40 @@ export default function PhotoInsideBagScreen({
     };
   }, [itemCount]);
 
+  // Upload photo to database
+  const uploadPhotoToDatabase = useCallback(async (photo: CameraCapturedPicture) => {
+    if (!orderId || !bagId) {
+      console.error('Missing orderId or bagId for photo upload');
+      setUploadError('Missing order or bag information');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      const uploadedPhoto = await photoService.uploadPhoto({
+        orderId,
+        bagId,
+        photoUri: photo.uri,
+      });
+
+      console.log('Photo uploaded successfully to database:', uploadedPhoto);
+      setIsUploading(false);
+    } catch (error: any) {
+      console.error('Error uploading photo to database:', error);
+      setUploadError(error.message || 'Failed to upload photo');
+      setIsUploading(false);
+      
+      // Show alert to user
+      Alert.alert(
+        'Upload Failed',
+        'Failed to save photo to database. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  }, [orderId, bagId]);
+
   // Auto-capture photo when camera is ready
   useEffect(() => {
     if (isCameraReady && !capturedPhoto && cameraRef.current) {
@@ -88,15 +126,19 @@ export default function PhotoInsideBagScreen({
             });
             setCapturedPhoto(photo);
             console.log('Photo captured automatically:', photo.uri);
+            
+            // Upload photo to database
+            await uploadPhotoToDatabase(photo);
           }
         } catch (error) {
           console.error('Error capturing photo:', error);
+          setUploadError('Failed to capture photo');
         }
       }, 1500); // 1.5 second delay to ensure camera is stable
 
       return () => clearTimeout(captureTimer);
     }
-  }, [isCameraReady, capturedPhoto]);
+  }, [isCameraReady, capturedPhoto, uploadPhotoToDatabase]);
 
   const isDetectionComplete = detectedItems >= itemCount;
 
@@ -175,6 +217,25 @@ export default function PhotoInsideBagScreen({
                     {isDetectionComplete ? ' ✓' : ' ...'}
                   </Text>
                 </View>
+
+                {/* Upload Status Indicator */}
+                {capturedPhoto && (
+                  <View style={styles.uploadStatusBadge}>
+                    {isUploading ? (
+                      <Text style={styles.uploadStatusText}>
+                        📤 Uploading to database...
+                      </Text>
+                    ) : uploadError ? (
+                      <Text style={[styles.uploadStatusText, styles.uploadStatusError]}>
+                        ❌ Upload failed
+                      </Text>
+                    ) : (
+                      <Text style={[styles.uploadStatusText, styles.uploadStatusSuccess]}>
+                        ✓ Saved to database
+                      </Text>
+                    )}
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -358,6 +419,25 @@ const styles = StyleSheet.create({
   },
   detectionTextComplete: {
     color: colors.white, // White text when complete
+  },
+  uploadStatusBadge: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.xs + 2, // 6px
+    borderRadius: radius.medium,
+    ...shadows.card,
+    marginTop: spacing.xs,
+  },
+  uploadStatusText: {
+    ...typography.c1,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  uploadStatusSuccess: {
+    color: colors.success,
+  },
+  uploadStatusError: {
+    color: colors.error,
   },
 });
 
