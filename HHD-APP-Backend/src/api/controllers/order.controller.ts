@@ -64,19 +64,29 @@ export const getOrder = async (
     const { orderId } = req.params;
     const userId = req.user?.id;
 
-    const order = await Order.findOne({ orderId, userId });
-
+    // Try to find order - first try with userId, then without userId
+    // This allows users to access orders even if not directly assigned to them
+    let order = await Order.findOne({ orderId, userId });
+    
+    // If order not found with userId, try without userId filter
+    // This allows scanning any order by orderId
     if (!order) {
-      throw new ErrorResponse(`Order not found with id of ${orderId}`, 404);
+      order = await Order.findOne({ orderId });
     }
 
-    // Get items for this order
+    // Get items for this order (items are not user-specific)
     const items = await Item.find({ orderId });
+
+    // If order doesn't exist but items do, still return items
+    // This allows users to scan orders and see items even if order record doesn't exist
+    if (!order && items.length === 0) {
+      throw new ErrorResponse(`Order not found with id of ${orderId}`, 404);
+    }
 
     res.status(200).json({
       success: true,
       data: {
-        order,
+        order: order || null, // Return null if order doesn't exist but items do
         items,
       },
     });

@@ -74,27 +74,27 @@ const generalLimiter = rateLimit({
   },
 });
 
-// Stricter rate limiter for authentication endpoints (to prevent abuse)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 OTP requests per 15 minutes per IP
-  message: {
-    error: 'Too many authentication requests',
-    message: 'Too many authentication attempts. Please try again later.',
-    retryAfter: 900, // 15 minutes in seconds
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    res.setHeader('Retry-After', 900);
-    res.status(429).json({
-      success: false,
-      error: 'Too many authentication requests',
-      message: 'Too many authentication attempts. Please wait 15 minutes before trying again.',
-      retryAfter: 900,
-    });
-  },
-});
+// Authentication rate limiter removed - users can log in without restrictions
+// const authLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutes
+//   max: 10, // 10 OTP requests per 15 minutes per IP
+//   message: {
+//     error: 'Too many authentication requests',
+//     message: 'Too many authentication attempts. Please try again later.',
+//     retryAfter: 900, // 15 minutes in seconds
+//   },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+//   handler: (req, res) => {
+//     res.setHeader('Retry-After', 900);
+//     res.status(429).json({
+//       success: false,
+//       error: 'Too many authentication requests',
+//       message: 'Too many authentication attempts. Please wait 15 minutes before trying again.',
+//       retryAfter: 900,
+//     });
+//   },
+// });
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -141,9 +141,9 @@ app.get('/health', (req, res) => {
 // Apply general rate limiter to all API routes
 app.use('/api/', generalLimiter);
 
-// Apply stricter rate limiter to authentication routes
-app.use('/api/auth/send-otp', authLimiter);
-app.use('/api/auth/verify-otp', authLimiter);
+// Authentication rate limiting removed - users can log in without restrictions
+// app.use('/api/auth/send-otp', authLimiter);
+// app.use('/api/auth/verify-otp', authLimiter);
 
 // API routes
 app.use('/api/auth', authRoutes);

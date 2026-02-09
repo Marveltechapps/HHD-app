@@ -118,7 +118,14 @@ export default function ScanRackQRScreen({
 
         console.log('✅ Rack scanned and saved to database:', rack);
         
-        // Show success message
+        // Reset submitting state immediately
+        setIsSubmitting(false);
+        
+        // Navigate immediately after successful scan (don't wait for Alert)
+        // Pass rack location back to parent component
+        onScanComplete?.(rack.location || rack.rackCode);
+        
+        // Show success message as non-blocking notification
         Alert.alert(
           'Rack Scanned Successfully',
           `Rack Code: ${rack.rackCode}\nLocation: ${rack.location}\nZone: ${rack.zone}`,
@@ -126,9 +133,7 @@ export default function ScanRackQRScreen({
             {
               text: 'OK',
               onPress: () => {
-                setIsSubmitting(false);
-                // Pass rack location back to parent component
-                onScanComplete?.(rack.location || rack.rackCode); // Navigate to next screen after successful scan
+                // Navigation already happened, just close alert
               },
             },
           ]

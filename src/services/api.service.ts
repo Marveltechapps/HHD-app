@@ -251,8 +251,16 @@ class ApiService {
 
         return await this.handleResponse<T>(response);
       } catch (error: any) {
-        // Don't log 404 errors as errors - they're expected in some cases (e.g., order moved to CompletedOrders)
-        if (error.status !== 404) {
+        // Only log unexpected errors (5xx, network, timeout) as errors
+        // Log 4xx client errors (like 404, 400) as warnings since they're expected business logic responses
+        const isClientError = error.status >= 400 && error.status < 500;
+        
+        if (isClientError) {
+          // 4xx errors are expected business logic responses (e.g., order not found, validation errors)
+          // Log as warning to avoid triggering React Native LogBox
+          console.warn('[API] GET Client Error (expected):', error.message || error);
+        } else {
+          // 5xx errors, network errors, and timeouts are unexpected - log as errors
           console.error('[API] GET Error:', error);
         }
         
@@ -329,12 +337,23 @@ class ApiService {
         console.log('[API] Response status:', response.status);
         return await this.handleResponse<T>(response);
       } catch (error: any) {
-        console.error('[API] POST Error:', error);
-        console.error('[API] Error details:', {
-          message: error.message,
-          name: error.name,
-          stack: error.stack,
-        });
+        // Only log unexpected errors (5xx, network, timeout) as errors
+        // Log 4xx client errors (like 400 Bad Request) as warnings since they're expected business logic responses
+        const isClientError = error.status >= 400 && error.status < 500;
+        
+        if (isClientError) {
+          // 4xx errors are expected business logic responses (e.g., rack not available)
+          // Log as warning to avoid triggering React Native LogBox
+          console.warn('[API] POST Client Error (expected):', error.message || error);
+        } else {
+          // 5xx errors, network errors, and timeouts are unexpected - log as errors
+          console.error('[API] POST Error:', error);
+          console.error('[API] Error details:', {
+            message: error.message,
+            name: error.name,
+            stack: error.stack,
+          });
+        }
         
         // Preserve original error information for retry logic
         const isAbortError = error.name === 'AbortError';
