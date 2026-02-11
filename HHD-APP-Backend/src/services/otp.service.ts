@@ -67,23 +67,13 @@ export class OTPService {
       // Generate OTP first (fast operation, no DB needed)
       const otp = this.generateOTP();
       const expiresAt = new Date();
-      expiresAt.setMinutes(
-        expiresAt.getMinutes() + parseInt(process.env.OTP_EXPIRE_MINUTES || '10', 10)
-      );
+      // Set expiration to 10 minutes (600 seconds) - ensure it's a reasonable time
+      const expireMinutes = parseInt(process.env.OTP_EXPIRE_MINUTES || '10', 10);
+      const expireMinutesClamped = Math.max(5, Math.min(30, expireMinutes)); // Clamp between 5-30 minutes
+      expiresAt.setMinutes(expiresAt.getMinutes() + expireMinutesClamped);
+      
+      logger.info(`[OTP Service] OTP expiration set to ${expireMinutesClamped} minutes for mobile: ${normalizedMobile}`);
 
-      // Delete existing OTPs asynchronously (non-blocking) - don't wait for it
-      // This improves response time as delete is not critical
-      // Use normalized mobile to ensure consistency
-      OTP.deleteMany({ mobile: normalizedMobile, isUsed: false })
-        .then(() => {
-          logger.debug(`[OTP Service] Deleted existing OTPs for mobile: ${normalizedMobile}`);
-        })
-        .catch((deleteError: any) => {
-          logger.warn(`[OTP Service] Failed to delete existing OTPs for mobile: ${normalizedMobile}`, {
-            error: deleteError.message,
-          });
-          // Continue even if delete fails
-        });
 
       // Save OTP with timeout protection (reduced to 3 seconds for faster response)
       // Use normalized mobile to ensure consistency
@@ -99,6 +89,17 @@ export class OTPService {
         throw new Error(`Invalid OTP format: ${otpString}`);
       }
       
+      // Wait for delete to complete before creating new OTP (prevents race conditions)
+      try {
+        await OTP.deleteMany({ mobile: normalizedMobile, isUsed: false });
+        logger.debug(`[OTP Service] Deleted existing OTPs for mobile: ${normalizedMobile}`);
+      } catch (deleteError: any) {
+        logger.warn(`[OTP Service] Failed to delete existing OTPs for mobile: ${normalizedMobile}`, {
+          error: deleteError.message,
+        });
+        // Continue - we'll create the new OTP anyway
+      }
+      
       const createdOtp = await Promise.race([
         OTP.create({
           mobile: normalizedMobile,
@@ -106,14 +107,21 @@ export class OTPService {
           expiresAt,
         }),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Save OTP timeout')), 3000)
+          setTimeout(() => reject(new Error('Save OTP timeout')), 5000)
         ),
       ]);
 
-      logger.info(`[OTP Service] OTP created successfully for mobile: ${normalizedMobile}`, {
+      // Verify the OTP was saved correctly by reading it back
+      const savedOtp = await OTP.findById(createdOtp._id);
+      if (!savedOtp) {
+        throw new Error('OTP was not saved correctly');
+      }
+
+      logger.info(`[OTP Service] OTP created and verified for mobile: ${normalizedMobile}`, {
         otp: otpString,
-        otpStored: createdOtp.otp,
-        otpStoredType: typeof createdOtp.otp,
+        otpStored: savedOtp.otp,
+        otpStoredType: typeof savedOtp.otp,
+        otpStoredLength: String(savedOtp.otp).length,
         expiresAt: expiresAt.toISOString(),
       });
       return otpString;
@@ -145,71 +153,71 @@ export class OTPService {
       // Ensure database connection before operations
       await this.ensureConnection();
       
-      // First, find all OTPs for this mobile to debug
-      const allOtps = await OTP.find({ mobile: normalizedMobile }).sort({ createdAt: -1 }).limit(5);
-      logger.info(`[OTP Service] Found ${allOtps.length} OTP records for mobile: ${normalizedMobile}`, {
-        records: allOtps.map(r => ({
-          otp: r.otp,
-          otpString: String(r.otp).trim(),
-          otpType: typeof r.otp,
-          isUsed: r.isUsed,
-          expiresAt: r.expiresAt,
-          createdAt: r.createdAt,
-          expired: r.expiresAt < new Date(),
-        })),
-      });
-      
-      // Verify OTP with timeout protection
-      // Use exact string match (MongoDB does case-sensitive string comparison)
-      // Also try to find by comparing all valid OTPs to handle any edge cases
+      // Use MongoDB query first (most efficient and reliable)
       const currentTime = new Date();
-      const validOtps = allOtps.filter(r => !r.isUsed && r.expiresAt > currentTime);
+      let otpRecord: any = null;
       
-      logger.info(`[OTP Service] Checking ${validOtps.length} valid OTPs for mobile: ${normalizedMobile}`, {
-        providedOtp: normalizedOtp,
-        providedOtpLength: normalizedOtp.length,
-        validOtps: validOtps.map(r => ({
-          otp: r.otp,
-          otpType: typeof r.otp,
-          otpLength: String(r.otp).length,
-          matches: String(r.otp).trim() === normalizedOtp,
-        })),
-      });
-
-      // First try exact query match
-      let otpRecord = await Promise.race([
-        OTP.findOne({
-          mobile: normalizedMobile,
-          otp: normalizedOtp, // Exact string match
-          isUsed: false,
-          expiresAt: { $gt: currentTime },
-        }),
-        new Promise<any>((_, reject) =>
-          setTimeout(() => reject(new Error('Verify OTP timeout')), 5000)
-        ),
-      ]);
-
-      // If not found, try manual comparison (fallback for edge cases)
-      // This handles cases where MongoDB query might fail due to type/encoding issues
-      if (!otpRecord && validOtps.length > 0) {
-        logger.info(`[OTP Service] Exact query match failed, trying manual comparison`);
+      try {
+        // Try exact string match first
+        otpRecord = await Promise.race([
+          OTP.findOne({
+            mobile: normalizedMobile,
+            otp: normalizedOtp, // Exact string match
+            isUsed: false,
+            expiresAt: { $gt: currentTime },
+          }).sort({ createdAt: -1 }), // Get most recent OTP
+          new Promise<any>((_, reject) =>
+            setTimeout(() => reject(new Error('Verify OTP timeout')), 5000)
+          ),
+        ]);
+        
+        if (otpRecord) {
+          logger.info(`[OTP Service] Found exact match via MongoDB query for mobile: ${normalizedMobile}`);
+        }
+      } catch (queryError: any) {
+        logger.warn(`[OTP Service] MongoDB query failed: ${queryError.message}`);
+        // Fall back to manual comparison
+      }
+      
+      // If MongoDB query didn't find a match, try manual comparison as fallback
+      if (!otpRecord) {
+        logger.info(`[OTP Service] MongoDB query didn't find match, trying manual comparison`);
+        
+        // Find all OTPs for this mobile
+        const allOtps = await OTP.find({ mobile: normalizedMobile })
+          .sort({ createdAt: -1 })
+          .limit(5);
+        
+        const validOtps = allOtps.filter(r => !r.isUsed && r.expiresAt > currentTime);
+        
+        logger.info(`[OTP Service] Checking ${validOtps.length} valid OTPs manually for mobile: ${normalizedMobile}`, {
+          providedOtp: normalizedOtp,
+          providedOtpLength: normalizedOtp.length,
+          validOtps: validOtps.map(r => ({
+            otp: String(r.otp).trim(),
+            otpType: typeof r.otp,
+            isUsed: r.isUsed,
+            expired: r.expiresAt <= currentTime,
+          })),
+        });
+        
+        // Try manual comparison
         for (const record of validOtps) {
-          // Normalize both OTPs for comparison (handle any type/whitespace issues)
           const recordOtp = String(record.otp).trim();
           const providedOtp = normalizedOtp.trim();
           
-          // Try exact match first
+          // Exact string match
           if (recordOtp === providedOtp) {
-            logger.info(`[OTP Service] Found match via manual comparison: ${recordOtp} === ${providedOtp}`);
+            logger.info(`[OTP Service] Found exact match: "${recordOtp}" === "${providedOtp}"`);
             otpRecord = record;
             break;
           }
           
-          // Also try comparing as numbers (in case one is stored as number)
+          // Numeric comparison (handle type mismatches)
           const recordOtpNum = parseInt(recordOtp, 10);
           const providedOtpNum = parseInt(providedOtp, 10);
           if (!isNaN(recordOtpNum) && !isNaN(providedOtpNum) && recordOtpNum === providedOtpNum) {
-            logger.info(`[OTP Service] Found match via numeric comparison: ${recordOtpNum} === ${providedOtpNum}`);
+            logger.info(`[OTP Service] Found numeric match: ${recordOtpNum} === ${providedOtpNum}`);
             otpRecord = record;
             break;
           }
@@ -217,15 +225,23 @@ export class OTPService {
       }
 
       if (!otpRecord) {
+        // Get all OTPs for debugging
+        const allOtps = await OTP.find({ mobile: normalizedMobile })
+          .sort({ createdAt: -1 })
+          .limit(5);
+        
         logger.warn(`[OTP Service] Invalid or expired OTP for mobile: ${normalizedMobile}`, {
           providedOtp: normalizedOtp,
           providedOtpType: typeof normalizedOtp,
           providedOtpLength: normalizedOtp.length,
-          availableOtps: validOtps.map(r => ({
+          currentTime: currentTime.toISOString(),
+          availableOtps: allOtps.map(r => ({
             otp: String(r.otp).trim(),
             otpType: typeof r.otp,
             isUsed: r.isUsed,
+            expiresAt: r.expiresAt.toISOString(),
             expired: r.expiresAt <= currentTime,
+            createdAt: r.createdAt.toISOString(),
           })),
         });
         return false;
@@ -237,16 +253,24 @@ export class OTPService {
         expiresAt: otpRecord.expiresAt,
       });
 
-      // Mark OTP as used with timeout protection
+      // Mark OTP as used with timeout protection (use atomic update to prevent race conditions)
       await Promise.race([
-        (async () => {
-          otpRecord.isUsed = true;
-          await otpRecord.save();
-        })(),
+        OTP.updateOne(
+          { _id: otpRecord._id, isUsed: false }, // Only update if not already used (prevents double-use)
+          { $set: { isUsed: true } }
+        ),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Mark OTP as used timeout')), 5000)
         ),
       ]);
+      
+      // Verify it was marked as used
+      const updatedOtp = await OTP.findById(otpRecord._id);
+      if (updatedOtp && !updatedOtp.isUsed) {
+        logger.warn(`[OTP Service] Failed to mark OTP as used, retrying...`);
+        // Retry once
+        await OTP.updateOne({ _id: otpRecord._id }, { $set: { isUsed: true } });
+      }
 
       logger.info(`[OTP Service] OTP verified successfully for mobile: ${mobile}`);
       return true;

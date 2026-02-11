@@ -104,9 +104,20 @@ class AuthService {
    * Verify OTP and login
    */
   async verifyOTP(mobile: string, otp: string): Promise<VerifyOTPResponse> {
+    // Ensure OTP is a clean string (remove any whitespace, ensure it's a string)
+    const cleanOtp = String(otp).trim();
+    const cleanMobile = String(mobile).trim();
+    
+    console.log('[Auth Service] Verifying OTP:', {
+      mobile: cleanMobile,
+      otp: cleanOtp,
+      otpLength: cleanOtp.length,
+      otpType: typeof cleanOtp,
+    });
+    
     const response = await apiService.post<VerifyOTPResponse>(
       API_ENDPOINTS.AUTH.VERIFY_OTP,
-      { mobile, otp },
+      { mobile: cleanMobile, otp: cleanOtp },
       false // No auth required
     );
 

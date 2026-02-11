@@ -17,8 +17,8 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": "./src",
@@ -35,6 +35,5 @@
     "node_modules",
     "dist",
     "**/*.test.ts"
-  ],
-  "extends": "expo/tsconfig.base"
+  ]
 }

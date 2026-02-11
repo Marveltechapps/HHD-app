@@ -377,7 +377,7 @@ class ApiService {
         }
         
         if (isNetworkError) {
-          const errorMsg = `Cannot connect to backend server at ${this.baseURL}.\n\nPlease ensure:\n1. Backend is running: cd HHD-APP-Backend && npm run dev\n2. Server is accessible at the configured URL\n3. Check if you're using the correct URL for your platform (web/Android/iOS)\n4. Verify both devices are on the same WiFi network\n5. Check Windows Firewall allows Node.js`;
+          const errorMsg = `Cannot connect to backend server.\n\nQuick Fix:\n1. Right-click "FIX_CONNECTION_ERROR.bat" → Run as Administrator\n2. Start backend: cd HHD-APP-Backend && npm run dev\n3. Restart Expo and reload app\n\nOr see QUICK_FIX.md for detailed steps.`;
           const apiError: ApiError = {
             message: errorMsg,
             status: 0,

@@ -169,6 +169,9 @@ export default function OTPScreen({
     try {
       const otpString = otp.join('');
       console.log('[OTP Screen] Verifying OTP for mobile:', mobileNumber);
+      console.log('[OTP Screen] OTP string:', otpString);
+      console.log('[OTP Screen] OTP length:', otpString.length);
+      console.log('[OTP Screen] OTP array:', otp);
       
       // Verify OTP via backend
       await login(mobileNumber, otpString);
