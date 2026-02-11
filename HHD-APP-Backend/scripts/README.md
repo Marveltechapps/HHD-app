@@ -55,11 +55,11 @@ npm run seed:assignorders-collection
 
 ## Seed Orders for All Users
 
-The `seed-orders-for-all-users.ts` script assigns 5 orders to **all users** present in the database users table:
+The `seed-orders-for-all-users.ts` script assigns 10 orders to **all users** present in the database users table:
 - Fetches all users from the `users` collection
-- Creates 5 unique orders for each user
-- Each user gets orders with different statuses (3 pending, 1 picking, 1 rack_assigned)
-- Orders are distributed across different zones (A, B, C, D)
+- Creates 10 unique orders for each user
+- Each user gets orders with different statuses (3 pending, 1 received, 1 bag_scanned, 2 picking, 2 rack_assigned, 1 completed)
+- Orders are distributed across different zones (A, B, C, D, repeating)
 - Each order includes associated items in the `items` collection
 
 **Usage:**
@@ -78,21 +78,26 @@ npm run seed:orders-for-all-users
 1. Connects to the database
 2. Fetches all users from the `users` collection
 3. For each user:
-   - Generates 5 unique order IDs (format: `ORDER-{userId}-{001-005}`)
+   - Generates 10 unique order IDs (format: `ORDER-{userId}-{001-010}`)
    - Deletes any existing orders with the same orderIds (if they exist)
-   - Creates 5 new orders with varying:
-     - Zones (A, B, C, D, A)
-     - Statuses (pending, pending, pending, picking, rack_assigned)
-     - Item counts (5, 7, 9, 11, 13)
-     - Target times (20, 25, 30, 35, 40 minutes)
+   - Creates 10 new orders with varying:
+     - Zones (A, B, C, D, repeating)
+     - Statuses (pending, pending, pending, received, bag_scanned, picking, picking, rack_assigned, rack_assigned, completed)
+     - Item counts (5, 7, 9, 11, 13, 15, 17, 19, 21, 23)
+     - Target times (20, 25, 30, 35, 40, 45, 50, 55, 60, 65 minutes)
    - Creates associated items for each order
 4. Displays a summary of all created orders and items
 
 ### Order Details per User
 
-Each user receives 5 orders:
+Each user receives 10 orders:
 - **Order 1**: Zone A, Status 'pending', 5 items, 20 min target
 - **Order 2**: Zone B, Status 'pending', 7 items, 25 min target
 - **Order 3**: Zone C, Status 'pending', 9 items, 30 min target
-- **Order 4**: Zone D, Status 'picking', 11 items, 35 min target
-- **Order 5**: Zone A, Status 'rack_assigned', 13 items, 40 min target
+- **Order 4**: Zone D, Status 'received', 11 items, 35 min target
+- **Order 5**: Zone A, Status 'bag_scanned', 13 items, 40 min target
+- **Order 6**: Zone B, Status 'picking', 15 items, 45 min target
+- **Order 7**: Zone C, Status 'picking', 17 items, 50 min target
+- **Order 8**: Zone D, Status 'rack_assigned', 19 items, 55 min target
+- **Order 9**: Zone A, Status 'rack_assigned', 21 items, 60 min target
+- **Order 10**: Zone B, Status 'completed', 23 items, 65 min target

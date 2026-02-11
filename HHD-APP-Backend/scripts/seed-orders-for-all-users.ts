@@ -50,8 +50,8 @@ const buildSeedItems = (orderId: string, itemCount: number): SeedItem[] => {
 };
 
 /**
- * Seed script to assign 5 orders to all users in the database
- * Each user will get 5 orders with different statuses and zones
+ * Seed script to assign 10 orders to all users in the database
+ * Each user will get 10 orders with different statuses and zones
  */
 const seedOrdersForAllUsers = async (): Promise<void> => {
   try {
@@ -73,8 +73,13 @@ const seedOrdersForAllUsers = async (): Promise<void> => {
       ORDER_STATUS.PENDING,
       ORDER_STATUS.PENDING,
       ORDER_STATUS.PENDING,
+      ORDER_STATUS.RECEIVED,
+      ORDER_STATUS.BAG_SCANNED,
+      ORDER_STATUS.PICKING,
       ORDER_STATUS.PICKING,
       ORDER_STATUS.RACK_ASSIGNED,
+      ORDER_STATUS.RACK_ASSIGNED,
+      ORDER_STATUS.COMPLETED,
     ];
 
     let totalOrdersCreated = 0;
@@ -84,10 +89,11 @@ const seedOrdersForAllUsers = async (): Promise<void> => {
     for (let userIndex = 0; userIndex < users.length; userIndex++) {
       const user = users[userIndex];
       console.log(`\n📦 Processing user ${userIndex + 1}/${users.length}: ${user.name || user.mobile} (${user._id})`);
+      console.log(`   📱 Phone: ${user.mobile}`);
 
       // Generate unique order IDs for this user
       const orderIds: string[] = [];
-      for (let i = 1; i <= 5; i++) {
+      for (let i = 1; i <= 10; i++) {
         const orderId = `ORDER-${String(user._id).slice(-6)}-${String(i).padStart(3, '0')}`;
         orderIds.push(orderId);
       }
@@ -108,11 +114,11 @@ const seedOrdersForAllUsers = async (): Promise<void> => {
         console.log('   ✅ Existing orders deleted');
       }
 
-      // Create 5 orders for this user
+      // Create 10 orders for this user
       const orders = orderIds.map((orderId, index) => {
         const zone = zones[index % zones.length];
         const status = statuses[index];
-        const itemCount = 5 + (index * 2); // Varying item counts: 5, 7, 9, 11, 13
+        const itemCount = 5 + (index * 2); // Varying item counts: 5, 7, 9, 11, 13, 15, 17, 19, 21, 23
 
         return {
           orderId,
@@ -125,15 +131,19 @@ const seedOrdersForAllUsers = async (): Promise<void> => {
           riderId: `RIDER-${String(user._id).slice(-6)}-${index + 1}`,
           rackLocation: `RACK-${zone.replace('Zone ', '')}-${index + 1}`,
           bagId: `BAG-${String(user._id).slice(-6)}-${index + 1}`,
-          targetTime: 20 + (index * 5), // Varying target times: 20, 25, 30, 35, 40
+          targetTime: 20 + (index * 5), // Varying target times: 20, 25, 30, 35, 40, 45, 50, 55, 60, 65
           ...(status !== ORDER_STATUS.PENDING && {
-            startedAt: new Date(),
+            startedAt: new Date(Date.now() - (index * 60000)), // Stagger start times
             ...(status === ORDER_STATUS.PICKING && { pickTime: 10 + index }),
+            ...(status === ORDER_STATUS.COMPLETED && { 
+              completedAt: new Date(Date.now() - (index * 30000)),
+              pickTime: 15 + index 
+            }),
           }),
         };
       });
 
-      console.log(`   📦 Creating 5 orders for user...`);
+      console.log(`   📦 Creating 10 orders for user...`);
       const createdOrders = await Order.insertMany(orders);
       totalOrdersCreated += createdOrders.length;
 
@@ -155,7 +165,7 @@ const seedOrdersForAllUsers = async (): Promise<void> => {
 
       console.log(`   ✅ Created ${createdOrders.length} orders with ${itemDocs.length} items`);
       createdOrders.forEach((order) => {
-        console.log(`      - ${order.orderId}: Zone=${order.zone}, Status=${order.status}`);
+        console.log(`      - ${order.orderId}: Zone=${order.zone}, Status=${order.status}, Items=${order.itemCount}`);
       });
     }
 

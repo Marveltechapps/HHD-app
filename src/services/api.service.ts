@@ -315,8 +315,9 @@ class ApiService {
     includeAuth: boolean = true
   ): Promise<ApiResponse<T>> {
     const isOTPEndpoint = endpoint.includes('/auth/send-otp') || endpoint.includes('/auth/verify-otp');
+    const isSendOTPEndpoint = endpoint.includes('/auth/send-otp');
     const timeout = isOTPEndpoint ? 45000 : 30000; // Increased OTP timeout to 45s for slow networks
-    const shouldRetry = isOTPEndpoint; // Retry OTP requests on failure
+    const shouldRetry = isOTPEndpoint && !isSendOTPEndpoint; // Retry verify-otp requests on failure, but not send-otp (one attempt only)
     
     const makeRequest = async (): Promise<ApiResponse<T>> => {
       try {
