@@ -6,6 +6,8 @@ import {
   Modal,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {
   colors,
@@ -14,28 +16,103 @@ import {
   radius,
   shadows,
 } from '../design-system/tokens';
+import { pickService, PickIssueType, PickNextAction } from '../services/pick.service';
 
 interface ReportIssueModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit?: (issueType: string) => void;
+  // New props for API integration
+  orderId: string;
+  sku: string;
+  binId: string;
+  deviceId?: string;
+  onIssueReported?: (nextAction: PickNextAction, binId?: string) => void;
 }
+
+// Map display text to API issue type
+const ISSUE_TYPE_MAP: Record<string, PickIssueType> = {
+  'Item Damaged': 'ITEM_DAMAGED',
+  'Item Missing / Not in Bin': 'ITEM_MISSING',
+  'Item Expired': 'ITEM_EXPIRED',
+  'Wrong Item in Bin': 'WRONG_ITEM',
+};
 
 export default function ReportIssueModal({
   visible,
   onClose,
   onSubmit,
+  orderId,
+  sku,
+  binId,
+  deviceId,
+  onIssueReported,
 }: ReportIssueModalProps) {
   const [selectedIssue, setSelectedIssue] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSelectIssue = (issueType: string) => {
-    setSelectedIssue(issueType);
-    onSubmit?.(issueType);
-    onClose();
+  const handleSelectIssue = async (displayText: string) => {
+    const issueType = ISSUE_TYPE_MAP[displayText];
+    if (!issueType) {
+      setError('Invalid issue type selected');
+      return;
+    }
+
+    setSelectedIssue(displayText);
+    setError(null);
+
+    // Call legacy onSubmit if provided (for backward compatibility)
+    if (onSubmit) {
+      onSubmit(displayText);
+      onClose();
+      return;
+    }
+
+    // New API-based flow
+    try {
+      setLoading(true);
+
+      const response = await pickService.reportIssue({
+        orderId,
+        sku,
+        binId,
+        issueType,
+        deviceId,
+        timestamp: new Date().toISOString(),
+      });
+
+      setLoading(false);
+      onClose();
+      setSelectedIssue('');
+
+      // Notify parent component about the response
+      if (onIssueReported) {
+        onIssueReported(response.nextAction, response.binId);
+      }
+    } catch (err: any) {
+      setLoading(false);
+      const errorMessage = err?.message || 'Failed to report issue. Please try again.';
+      setError(errorMessage);
+      
+      Alert.alert(
+        'Error',
+        errorMessage,
+        [
+          {
+            text: 'OK',
+            onPress: () => setError(null),
+          },
+        ]
+      );
+    }
   };
 
   const handleClose = () => {
+    if (loading) return; // Prevent closing while loading
+    
     setSelectedIssue('');
+    setError(null);
     onClose();
   };
 
@@ -74,29 +151,51 @@ export default function ReportIssueModal({
               style={[
                 styles.optionItem,
                 selectedIssue === option && styles.optionItemSelected,
+                loading && styles.optionItemDisabled,
               ]}
               onPress={() => handleSelectIssue(option)}
               activeOpacity={0.8}
+              disabled={loading}
             >
-              <Text
-                style={[
-                  styles.optionText,
-                  selectedIssue === option && styles.optionTextSelected,
-                ]}
-              >
-                {option}
-              </Text>
+              {loading && selectedIssue === option ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={[styles.optionText, styles.loadingText]}>
+                    Reporting...
+                  </Text>
+                </View>
+              ) : (
+                <Text
+                  style={[
+                    styles.optionText,
+                    selectedIssue === option && styles.optionTextSelected,
+                    loading && styles.optionTextDisabled,
+                  ]}
+                >
+                  {option}
+                </Text>
+              )}
             </TouchableOpacity>
           ))}
         </View>
 
+        {/* Error Message */}
+        {error && !loading && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
         {/* Cancel Button */}
         <TouchableOpacity
-          style={styles.cancelButton}
+          style={[styles.cancelButton, loading && styles.cancelButtonDisabled]}
           onPress={handleClose}
           activeOpacity={0.8}
+          disabled={loading}
         >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
+          <Text style={[styles.cancelButtonText, loading && styles.cancelButtonTextDisabled]}>
+            Cancel
+          </Text>
         </TouchableOpacity>
       </View>
     </Modal>
@@ -176,6 +275,40 @@ const styles = StyleSheet.create({
     ...typography.b1,
     fontWeight: '600',
     color: colors.text.secondary,
+  },
+  cancelButtonDisabled: {
+    opacity: 0.5,
+  },
+  cancelButtonTextDisabled: {
+    opacity: 0.5,
+  },
+  optionItemDisabled: {
+    opacity: 0.6,
+  },
+  optionTextDisabled: {
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.s,
+  },
+  loadingText: {
+    marginLeft: spacing.s,
+  },
+  errorContainer: {
+    marginTop: spacing.m,
+    padding: spacing.m,
+    borderRadius: radius.medium,
+    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+    borderWidth: 1,
+    borderColor: colors.priority.high,
+  },
+  errorText: {
+    ...typography.b2,
+    color: colors.priority.high,
+    textAlign: 'center',
   },
 });
 

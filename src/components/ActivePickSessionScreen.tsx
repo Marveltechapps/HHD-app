@@ -22,6 +22,7 @@ import ReportIssueModal from './ReportIssueModal';
 import PausePickingModal from './PausePickingModal';
 import OrderDetailsModal from './OrderDetailsModal';
 import CancelOrderModal from './CancelOrderModal';
+import AlternateBinScreen from './AlternateBinScreen';
 import { scannedItemService } from '../services/scannedItem.service';
 import { itemService, Item as ApiItem } from '../services/item.service';
 import { orderService } from '../services/order.service';
@@ -39,6 +40,7 @@ interface OrderItem {
   id: string;
   name: string;
   crateId: string;
+  itemCode?: string; // SKU from API
   quantity: number; // Total quantity needed for this item
   grammage: string;
   mrp: string;
@@ -75,6 +77,7 @@ const mapApiItemsToOrderItems = (apiItems: any[]): OrderItem[] => {
       id: item._id || item.itemId || String(index),
       name: item.name,
       crateId,
+      itemCode: item.itemCode || item.itemId || crateId, // Store itemCode for API calls
       quantity: item.quantity || 1,
       grammage,
       mrp,
@@ -129,6 +132,8 @@ export default function ActivePickSessionScreen({
   const [showCancelOrderModal, setShowCancelOrderModal] = useState(false);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAlternateBinScreen, setShowAlternateBinScreen] = useState(false);
+  const [alternateBinId, setAlternateBinId] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
 
   // Fetch order items from API
@@ -486,9 +491,28 @@ export default function ActivePickSessionScreen({
       <ReportIssueModal
         visible={showReportIssueModal}
         onClose={() => setShowReportIssueModal(false)}
-        onSubmit={(issueType) => {
-          console.log('Issue reported:', issueType);
-          // Handle issue submission
+        orderId={orderId}
+        sku={currentOrderItem?.itemCode || currentOrderItem?.crateId || currentOrderItem?.id || ''}
+        binId={currentOrderItem?.bin || ''}
+        deviceId="HHD-0234" // TODO: Get from context or props
+        onIssueReported={(nextAction, binId) => {
+          if (nextAction === 'ALTERNATE_BIN' && binId) {
+            // Navigate to alternate bin screen
+            setAlternateBinId(binId);
+            setShowReportIssueModal(false);
+            setShowAlternateBinScreen(true);
+          } else {
+            // Mark item as short and move to next item
+            setShowReportIssueModal(false);
+            // Move to next item
+            if (currentItemIndex < orderItems.length - 1) {
+              setCurrentItemIndex(currentItemIndex + 1);
+              setScannedCount(0); // Reset scanned count for new item
+            } else {
+              // All items processed, could trigger completion flow
+              console.log('All items processed');
+            }
+          }
         }}
       />
 

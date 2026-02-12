@@ -50,3 +50,31 @@ export const ZONE = {
   C: 'Zone C',
   D: 'Zone D',
 } as const;
+
+export const PICK_ISSUE_TYPE = {
+  ITEM_DAMAGED: 'ITEM_DAMAGED',
+  ITEM_MISSING: 'ITEM_MISSING',
+  ITEM_EXPIRED: 'ITEM_EXPIRED',
+  WRONG_ITEM: 'WRONG_ITEM',
+} as const;
+
+export const INVENTORY_STATUS = {
+  AVAILABLE: 'available',
+  DAMAGED: 'damaged',
+  EXPIRED: 'expired',
+  BLOCKED: 'blocked',
+  RESERVED: 'reserved',
+} as const;
+
+export const ITEM_STATUS_EXTENDED = {
+  ...ITEM_STATUS,
+  PICKED: 'picked',
+  SHORT: 'short',
+  ON_HOLD: 'on_hold',
+  REASSIGNED: 'reassigned',
+} as const;
+
+export const PICK_NEXT_ACTION = {
+  ALTERNATE_BIN: 'ALTERNATE_BIN',
+  SKIP_ITEM: 'SKIP_ITEM',
+} as const;

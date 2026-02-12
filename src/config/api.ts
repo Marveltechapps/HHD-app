@@ -158,4 +158,8 @@ export const API_ENDPOINTS = {
   USERS: {
     PROFILE: '/users/profile',
   },
+  // Pick
+  PICK: {
+    REPORT_ISSUE: '/pick/report-issue',
+  },
 } as const;

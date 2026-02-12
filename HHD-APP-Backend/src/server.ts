@@ -19,7 +19,11 @@ function getLocalIP(): string {
     if (nets) {
       for (const net of nets) {
         // Skip internal (loopback) and non-IPv4 addresses
-        if (net.family === 'IPv4' && !net.internal) {
+        // Handle both string ('IPv4') and number (4) family values for Node.js compatibility
+        // Type assertion needed because Node.js types can vary between versions
+        const family = net.family as string | number;
+        const isIPv4 = family === 'IPv4' || family === 4;
+        if (isIPv4 && !net.internal) {
           return net.address;
         }
       }
@@ -28,7 +32,8 @@ function getLocalIP(): string {
   return 'localhost';
 }
 
-const PORT = process.env.PORT || 5000;
+// Ensure PORT is always a number
+const PORT = Number(process.env.PORT) || 5000;
 const HOST = process.env.HOST || '0.0.0.0';
 const LOCAL_IP = getLocalIP();
 

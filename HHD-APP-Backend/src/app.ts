@@ -25,6 +25,7 @@ import taskRoutes from './api/routes/task.routes';
 import photoRoutes from './api/routes/photo.routes';
 import userRoutes from './api/routes/user.routes';
 import scannedItemRoutes from './api/routes/scannedItem.routes';
+import pickRoutes from './api/routes/pick.routes';
 
 const app: Application = express();
 
@@ -155,6 +156,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/photos', photoRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/scanned-items', scannedItemRoutes);
+app.use('/api/pick', pickRoutes);
 
 // Error handling middleware (must be last)
 app.use(notFound);

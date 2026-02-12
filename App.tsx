@@ -210,11 +210,11 @@ function AppContent() {
   const handleSignOut = async () => {
     try {
       await logout();
-      setCurrentScreen('login');
+      setCurrentScreen('deviceReady');
     } catch (error) {
       console.error('Logout failed:', error);
-      // Still navigate to login
-    setCurrentScreen('login');
+      // Still navigate to deviceReady
+      setCurrentScreen('deviceReady');
     }
   };
 
