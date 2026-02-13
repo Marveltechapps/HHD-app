@@ -148,7 +148,7 @@ export default function LoginScreen({ onSendOTP }: LoginScreenProps) {
         
         Alert.alert(
           'Backend Server Not Running',
-          `Cannot connect to backend server.\n\nQuick Fix:\n\n1. Open terminal\n2. Run: cd HHD-APP-Backend\n3. Run: npm run dev\n4. Wait for "🚀 Server running on port 5000"\n5. Try again\n\nOr double-click: start-backend.bat`,
+          `Cannot connect to backend server.\n\nQuick Fix:\n\n1. Open terminal\n2. Run: cd backend\n3. Run: npm run dev\n4. Wait for "🚀 Server running on port 5000"\n5. Try again\n\nOr double-click: start-backend.bat`,
           [
             {
               text: 'OK',

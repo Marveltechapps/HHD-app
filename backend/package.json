@@ -12,11 +12,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "seed:assigned-orders": "tsx scripts/seed-assigned-orders.ts",
-    "seed:assignorders-collection": "tsx scripts/seed-assignorders-collection.ts",
-    "seed:orders-for-all-users": "tsx scripts/seed-orders-for-all-users.ts",
-    "prepare": "husky install"
+    "test:coverage": "jest --coverage"
   },
   "keywords": [
     "warehouse",

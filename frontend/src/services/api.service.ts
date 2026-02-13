@@ -378,7 +378,7 @@ class ApiService {
         }
         
         if (isNetworkError) {
-          const errorMsg = `Cannot connect to backend server.\n\nQuick Fix:\n1. Right-click "FIX_CONNECTION_ERROR.bat" → Run as Administrator\n2. Start backend: cd HHD-APP-Backend && npm run dev\n3. Restart Expo and reload app\n\nOr see QUICK_FIX.md for detailed steps.`;
+          const errorMsg = `Cannot connect to backend server.\n\nQuick Fix:\n1. Right-click "FIX_CONNECTION_ERROR.bat" → Run as Administrator\n2. Start backend: cd backend && npm run dev\n3. Restart Expo and reload app\n\nOr see QUICK_FIX.md for detailed steps.`;
           const apiError: ApiError = {
             message: errorMsg,
             status: 0,

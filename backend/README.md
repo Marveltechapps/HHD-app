@@ -29,8 +29,10 @@ Backend API for HHD (Hand-Held Device) warehouse order picking application. Buil
 
 ## Project Structure
 
+This folder is `backend/` at the repo root (next to `frontend/`).
+
 ```
-HHD-APP-Backend/
+backend/
 ├── src/
 │   ├── api/
 │   │   ├── controllers/    # Route controllers
@@ -42,7 +44,7 @@ HHD-APP-Backend/
 │   ├── utils/              # Logger, constants, ErrorResponse
 │   ├── app.ts              # Express app setup
 │   └── server.ts            # Server entry point
-├── .env.example            # Environment variables template
+├── .env                     # Environment variables (create from template below)
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -57,16 +59,13 @@ HHD-APP-Backend/
 ## Installation
 
 ```bash
-# Navigate to backend directory
-cd HHD-APP-Backend
+# From repo root, navigate to backend
+cd backend
 
 # Install dependencies
 npm install
 
-# Copy environment file
-cp .env.example .env
-
-# Edit .env with your configuration
+# Create .env with your configuration (see Environment Variables below)
 ```
 
 ## Environment Variables
