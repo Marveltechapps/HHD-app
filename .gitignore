@@ -1,15 +1,17 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# Dependencies (frontend + backend)
+# --- Not needed for production (dev-only, local, build artifacts) ---
+
+# Dependencies
 node_modules/
 
-# Expo / frontend
+# Expo
 .expo/
 dist/
 web-build/
 expo-env.d.ts
-frontend/ios
-frontend/android
+ios/
+android/
 .kotlin/
 *.orig.*
 *.jks
@@ -19,12 +21,7 @@ frontend/android
 *.mobileprovision
 .metro-health-check*
 
-# Backend
-backend/dist/
-backend/build/
-backend/uploads/
-backend/temp/
-backend/logs/
+# Logs
 *.log
 coverage/
 .nyc_output/
@@ -45,9 +42,10 @@ yarn-error.*
 # TypeScript
 *.tsbuildinfo
 
-# IDE (optional)
+# IDE / editor (not needed for production)
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 *~
